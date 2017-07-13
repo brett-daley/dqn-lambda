@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 sns.set_style("whitegrid")
 
-class MultiagentTargetPursuit:
+class TargetPursuit:
 	def __init__(self, cfg_parser, game_variant, sess):
 		self.cfg_parser = cfg_parser
 		self.game_variant = game_variant

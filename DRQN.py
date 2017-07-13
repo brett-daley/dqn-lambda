@@ -20,7 +20,7 @@ EPSILON_FINAL = 0.1 # Final value of epsilon (for exploration)
 TARGET_Q_UPDATE_FREQ = 1000
 EPS_TEST_TIME = 0.01
 
-class DRQNMultiagent:
+class DRQN:
 	def __init__(self, cfg_parser, n_actions, sess, is_mdrqn = False, is_distiller_companion = False, dim_obs_agts = None, agts = None):
 		self.cfg_parser = cfg_parser		
 		self.sess = sess

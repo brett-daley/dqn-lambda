@@ -1,7 +1,6 @@
-# from DRQN import DRQN
-from DRQNMultiagent import DRQNMultiagent
+from DRQN import DRQN
 import tensorflow as tf
-from MultiagentTargetPursuit import MultiagentTargetPursuit
+from TargetPursuit import TargetPursuit
 from PursuitEvader import PursuitEvader
 from utils_general import Data2DTraj
 import numpy as np
@@ -23,16 +22,14 @@ class DQNManager:
 		# There should definitely be one DRQN handler per game, since each one has a distinct e-greedy epsilon etc.
 		for i_game, game in enumerate(game_mgr.games):
 			# The scope should be unique and identify the teacher network ID (done here) and agent ID (done in DRQN)
-			self.dqns_all.append(DRQNMultiagent(cfg_parser = cfg_parser, sess = self.sess, 
-												n_actions = n_actions, agts = game.agts))
+			self.dqns_all.append(DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, agts=game.agts))
 
 		# Create a list of trainable teacher task variables, so TfSaver can later save and restore them
 		if n_teacher_dqns > 0:
 			self.teacher_vars = [v for v in tf.trainable_variables()]
 
 		if enable_mdrqn:
-			self.mdrqn = DRQNMultiagent(cfg_parser = cfg_parser, sess = self.sess, n_actions = n_actions, 
-										is_mdrqn = True,  dim_obs_agts = [agt.dim_obs for agt in game_mgr.games[0].agts])
+			self.mdrqn = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, is_mdrqn=True,  dim_obs_agts=[agt.dim_obs for agt in game_mgr.games[0].agts])
 
 		# Note: distillation assumes the inputs/outputs are homogeneous across all games (but can still be heterogeneous across all agents)
 		if enable_distiller:
@@ -42,8 +39,7 @@ class DQNManager:
 
 			self.distiller_companion = None # Such that KL distillation training gets a None input for its companion, if no double distillation
 			if enable_double_distiller:
-				self.distiller_companion = DRQNMultiagent(cfg_parser = cfg_parser, sess = self.sess, n_actions = n_actions, 
-										is_mdrqn = False, is_distiller_companion = True,  dim_obs_agts = [agt.dim_obs for agt in game_mgr.games[0].agts])
+				self.distiller_companion = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, is_mdrqn=False, is_distiller_companion=True,  dim_obs_agts=[agt.dim_obs for agt in game_mgr.games[0].agts])
 
 		self.sess.run(tf.global_variables_initializer())
 
@@ -430,7 +426,7 @@ class GameManager:
 				self.games.append(PursuitEvader(cfg_parser = cfg_parser, game_variant = variant, sess = sess))
 			# Multiagent target pursuit game
 			elif base_game_name == 'MultiagentTargetPursuit':
-				self.games.append(MultiagentTargetPursuit(cfg_parser = cfg_parser, game_variant = variant, sess = sess))
+				self.games.append(TargetPursuit(cfg_parser=cfg_parser, game_variant=variant, sess=sess))
 				
 			# Assuming actions and observation dimensions are consistent across games
 			self.n_actions = self.games[0].agts[0].n_actions 
