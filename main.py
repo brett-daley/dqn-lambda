@@ -105,8 +105,8 @@ def main():
 
 	# data_dir is empty, so train for new game
 	if data_dir == None:
-		# cfg_ini = 'config_SingleAgentSingleTargetPursuit.ini'
-		cfg_ini = 'config_MultiagentTargetPursuit_2player.ini'
+		cfg_ini = 'config_SingleAgentSingleTargetPursuit.ini'
+		# cfg_ini = 'config_MultiagentTargetPursuit_2player.ini'
 		# cfg_ini = 'config_MultiagentTargetPursuit_3player.ini'
 
 		# Read the config file and create a data directory for it

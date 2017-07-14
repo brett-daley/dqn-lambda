@@ -11,7 +11,6 @@ class Distiller:
 		self.sess = sess
 		self.minibatch_size = int(self.cfg_parser.get('root','minibatch_size'))
 		self.tracelength = int(self.cfg_parser.get('root','rnn_train_tracelength'))
-		self.n_agts = int(self.cfg_parser.get('root','n_agts'))
 
 		self.timeStep = 0
 	
@@ -32,17 +31,14 @@ class Distiller:
 		# 	self.replay_memory_double_distiller = ReplayMemory(n_trajs_max = 200, minibatch_size = self.minibatch_size, is_distillation_mem = True)
 
 	def init_distilled_agts(self):
-		self.agts = list()
-		for i_agt in xrange(0,self.n_agts):
-			self.agts.append(AgentDistilled(i_agt = i_agt, n_actions = self.n_actions, dim_obs = self.dim_obs_agts[i_agt]))
+		self.agt = AgentDistilled(i_agt=0, n_actions=self.n_actions, dim_obs=self.dim_obs_agts[0])
 
 		# Initialize agent NNs (need the game initialized at this point, since will need things like observation dimensions well-defined)
 		self.create_agts_nns()
 
 
 	def reset_agts_rnn_states(self):
-		for agt in self.agts:
-			agt.reset_rnn_state()
+		self.agt.reset_rnn_state()
 
 	def create_agts_nns(self):
 		# if self.is_double_distiller:
@@ -52,17 +48,15 @@ class Distiller:
 
 		# Create actual player NNs
 		self.parameter_sharing = False # each agent has its own distilled net for now
-		for agt in self.agts:
-			agt.create_nns(cfg_parser = self.cfg_parser, sess = self.sess, scope_suffix = scope_suffix, parameter_sharing = self.parameter_sharing, is_distillation_net = True)
+		self.agt.create_nns(cfg_parser=self.cfg_parser, sess=self.sess, scope_suffix=scope_suffix, parameter_sharing=self.parameter_sharing, is_distillation_net=True)
 
 
 	def update_distillation_Q_plot(self, iter, teacher):
 		truetracelengths, minibatch = teacher.replay_memory_distillation.sample_trace(tracelength = 1)
 		
-		i_agt = 0 # ID of agent whose data is being plotted
-		agt = self.agts[i_agt]
-		s_batch = np.vstack([row[i_agt] for row in minibatch[:,0]])
-		q_teacher_batch = np.vstack([row[i_agt] for row in minibatch[:,5]])
+		agt = self.agt
+		s_batch = np.vstack([row[0] for row in minibatch[:,0]])
+		q_teacher_batch = np.vstack([row[0] for row in minibatch[:,5]])
 
 		# s_batch = [data[0] for data in minibatch]
 		# q_teacher_batch = [data[1] for data in minibatch]

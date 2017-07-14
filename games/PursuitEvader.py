@@ -11,7 +11,6 @@ class PursuitEvader:
 		self.game_variant = game_variant
 
 		# Domain settings
-		self.n_agts = int(self.cfg_parser.get('root','n_agts'))
 		self.is_toroidal = self.cfg_parser.getboolean('root','is_toroidal')
 		self.max_time_game = int(self.cfg_parser.get('root','max_time_game'))
 		self.parameter_sharing = self.cfg_parser.getboolean('root','parameter_sharing')
@@ -69,27 +68,21 @@ class PursuitEvader:
 			nn_target_master  = create_specific_nn(cfg_parser = self.cfg_parser, sess = sess, scope = "nn_target"  + scope_suffix, var_reuse = False, dim_state_input = dim_obs, n_actions = n_actions, is_target_net = True, src_network = nn_predict_master)
 
 		# Create actual player NNs
-		for agt in self.agts:
-			agt.create_nns(cfg_parser = self.cfg_parser, sess = sess, scope_suffix = scope_suffix, env_s_0 = self.get_env_state(), parameter_sharing = self.parameter_sharing)
+		self.agt.create_nns(cfg_parser=self.cfg_parser, sess=sess, scope_suffix=scope_suffix, env_s_0=self.get_env_state(), parameter_sharing=self.parameter_sharing)
 
 	def init_agts_nnTs(self):
 		# Placed here since must be run after tf.all_variables_initialized()
-		for agt in self.agts:
-			agt.init_nnT()
+		self.agt.init_nnT()
 
 	def init_agts_tgts(self, sess):
 		# Init agents
-		self.agts = list()
-		for i_agt in xrange(0,self.n_agts):
-			xy_0 = self.get_init_player_state(player_type = 'agent', i_agt = i_agt)
-			self.agts.append(AgentGround(player_type = 'agent', cfg_parser = self.cfg_parser, game_variant = self.game_variant, i_agt = i_agt, n_agts = self.n_agts, xy_0 = xy_0, 
-							x_lim = self.x_lim, y_lim = self.y_lim, is_toroidal = self.is_toroidal, sess = sess))
-			# print "Agent", self.agts[i_agt].i, "| Action:", self.agts[i_agt].action_map
+		xy_0 = self.get_init_player_state(player_type='agent', i_agt=0)
+		self.agt = AgentGround(player_type='agent', cfg_parser=self.cfg_parser, game_variant=self.game_variant, i_agt=0, n_agts=1, xy_0=xy_0, x_lim=self.x_lim, y_lim=self.y_lim, is_toroidal=self.is_toroidal, sess=sess)
+		# print "Agent", self.agts[i_agt].i, "| Action:", self.agts[i_agt].action_map
 
 		# Init evader (which is just a special agent with index -1)
-		xy_0 = self.get_init_player_state(player_type = 'evader')
-		self.evader = AgentGround(player_type = 'evader', cfg_parser = self.cfg_parser, game_variant = self.game_variant, i_agt = 0, xy_0 = xy_0, 
-									x_lim = self.x_lim, y_lim = self.y_lim, is_toroidal = self.is_toroidal)
+		xy_0 = self.get_init_player_state(player_type='evader')
+		self.evader = AgentGround(player_type='evader', cfg_parser=self.cfg_parser, game_variant=self.game_variant, i_agt=0, xy_0=xy_0, x_lim=self.x_lim, y_lim=self.y_lim, is_toroidal=self.is_toroidal)
 
 	def reset_game(self):
 		# Game only runs for 40 timesteps, after which it is forcibly reset
@@ -99,11 +92,10 @@ class PursuitEvader:
 		self.next_joint_o = None # Store the observation to ensure consistency in noise/observation process when querying observations within same timestep
 
 		# Re-initialize agents
-		for agt in self.agts:
-			xy_0 = self.get_init_player_state(player_type = 'agent', i_agt = agt.i)
-			agt.reset_state(xy_0 = xy_0)
-			# Reset RNN state (does nothing for non-RNN case)
-			agt.reset_rnn_state()
+		xy_0 = self.get_init_player_state(player_type='agent', i_agt=self.agt.i)
+		self.agt.reset_state(xy_0=xy_0)
+		# Reset RNN state (does nothing for non-RNN case)
+		self.agt.reset_rnn_state()
 
 		# Init evader (which is just a special agent with index -1)
 		xy_0 = self.get_init_player_state(player_type = 'evader')
@@ -119,12 +111,12 @@ class PursuitEvader:
 		
 		x, y = np.random.random((2, 1))
 		self.scat_evader = self.ax.scatter(x, y, c=[1, 0, 0], s=200)
-		x, y, z = np.random.random((3, self.n_agts))
+		x, y, z = np.random.random((3, 1))
 		self.scat_agts = self.ax.scatter(x, y, c=z, s=200)
 
 	def plot(self, t):
 		self.scat_evader.set_offsets(self.evader.s)
-		s_list = [agt.s+(agt.i+1)/20. for agt in self.agts] # A bit of offset included in each agent so overlaps are easier to see
+		s_list = [self.agt.s+(self.agt.i+1)/20.] # A bit of offset included in each agent so overlaps are easier to see
 		self.scat_agts.set_offsets(s_list)
 		plt.title('Time %d' % (t))
 		plt.draw()
@@ -132,16 +124,10 @@ class PursuitEvader:
 	
 	def evader_captured(self, enforce_simult_capture):
 		n_times_captured = 0
+		if np.array_equal(self.agt.s, self.evader.s):
+			n_times_captured = 1
 
-		# Count # of agents that simultaneously captured the evader in current timestep
-		for agt in self.agts:
-			if np.array_equal(agt.s, self.evader.s):
-				n_times_captured += 1
-
-		# if n_times_captured > 0:
-		# 	print n_times_captured
-
-		if (enforce_simult_capture and n_times_captured == self.n_agts) or (not enforce_simult_capture and n_times_captured >= 1):
+		if (enforce_simult_capture and n_times_captured == 1) or (not enforce_simult_capture and n_times_captured >= 1):
 			return True
 
 		return False
@@ -155,7 +141,7 @@ class PursuitEvader:
 		# POMDP-ness (to ensure multiple queried observations at same timestep don't change due to noise)
 		if self.next_joint_o is None:
 			# First game timestep, so no preprocessed next_joint_o yet, grab a fresh one
-			return [agt.get_obs(self.get_env_state()) for agt in self.agts]
+			return [self.agt.get_obs(self.get_env_state())]
 		else:
 			# Get pre-processed observation
 			return self.next_joint_o
@@ -165,15 +151,14 @@ class PursuitEvader:
 		game_over = False
 		r = 0
 
-		if len(i_actions) < self.n_agts:
-			raise ValueError('Not enough actions specified! %d agents need exactly %d actions!' %(self.n_agts,self.n_agts))
+		if len(i_actions) != 1:
+			raise ValueError('Incorrect number of actions specified! 1 agent needs exactly 1 action!')
 
 		# Game itself propagates (in this case, evader moves)
 		self.evader.prop_action_evader()
 
 		# Agents execute actions
-		for i_agt, agt in enumerate(self.agts):
-			agt.exec_action_agt(one_hot_action = i_actions[i_agt])
+		self.agt.exec_action_agt(one_hot_action = i_actions[0])
 
 		# Check if evader was caught
 		if self.evader_captured(enforce_simult_capture = True):
@@ -187,7 +172,7 @@ class PursuitEvader:
 			game_over = True
 
 		# Pack next joint state
-		self.next_joint_o = [agt.get_obs(self.get_env_state()) for agt in self.agts]
+		self.next_joint_o = [self.agt.get_obs(self.get_env_state())]
 		# print next_joint_o
 		# print 'next_joint_o', next_joint_o
 		

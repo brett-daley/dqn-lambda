@@ -21,7 +21,7 @@ TARGET_Q_UPDATE_FREQ = 1000
 EPS_TEST_TIME = 0.01
 
 class DRQN:
-	def __init__(self, cfg_parser, n_actions, sess, is_mdrqn = False, is_distiller_companion = False, dim_obs_agts = None, agts = None):
+	def __init__(self, cfg_parser, n_actions, sess, is_mdrqn=False, is_distiller_companion=False, dim_obs_agts=None, agt=None):
 		self.cfg_parser = cfg_parser		
 		self.sess = sess
 		
@@ -45,14 +45,13 @@ class DRQN:
 			# These are very similar to distiller agents, but use a NN for actual q-learning (rather than distillation)
 			# They also have an internal replay memory which stores experiences from ALL games (unlike the distillation agents)
 			assert dim_obs_agts is not None
-			assert agts is None
-			self.n_agts = int(self.cfg_parser.get('root','n_agts'))
+			assert agt is None
 			self.dim_obs_agts = dim_obs_agts
 			self.init_mdrqn_agts()
 		else:
-			self.agts = agts
+			self.agt = agt
 
-		if self.agts[0].nn.is_rnn:
+		if self.agt.nn.is_rnn:
 			self.tracelength = int(self.cfg_parser.get('root','rnn_train_tracelength'))
 			# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
 			self.replay_memory = ReplayMemory(n_trajs_max = 200, minibatch_size = self.minibatch_size)
@@ -68,9 +67,7 @@ class DRQN:
 		self.plot_value_dqn = LineplotDynamic('Training Epoch','Value actual','')
 
 	def init_mdrqn_agts(self):
-		self.agts = list()
-		for i_agt in xrange(0,self.n_agts):
-			self.agts.append(AgentDistilled(i_agt = i_agt, n_actions = self.n_actions, dim_obs = self.dim_obs_agts[i_agt]))
+		self.agt = AgentDistilled(i_agt=0, n_actions=self.n_actions, dim_obs=self.dim_obs_agts[0])
 
 		# Initialize agent NNs (need the game initialized at this point, since will need things like observation dimensions well-defined)
 		self.create_mdrqn_nns()
@@ -95,14 +92,14 @@ class DRQN:
 		for agt in self.agts:
 				agt.init_nnT()
 
-	def update_Q_plot(self, timestep, hl_name = None, label = None, i_agt_to_plot = 0, s_batch_prespecified = None, a_batch_prespecified = None):
-		agt = self.agts[i_agt_to_plot]
+	def update_Q_plot(self, timestep, hl_name=None, label=None, s_batch_prespecified=None, a_batch_prespecified=None):
+		agt = self.agt
 
 		if s_batch_prespecified is None:
 			# Since tracelength of 1 used, this ensures that truetracelengths = [1,....,1] and no masking required below
 			_, minibatch = self.replay_memory.sample_trace(tracelength = 1)
-			s_batch = np.vstack([row[i_agt_to_plot] for row in minibatch[:,0]])
-			a_batch = np.vstack([row[i_agt_to_plot] for row in minibatch[:,1]])
+			s_batch = np.vstack([row[0] for row in minibatch[:,0]])
+			a_batch = np.vstack([row[0] for row in minibatch[:,1]])
 			minibatch_size_plot = self.minibatch_size
 		else:
 			s_batch = s_batch_prespecified
@@ -141,7 +138,7 @@ class DRQN:
 		return x, y_mean, y_stdev
 
 	def get_processed_minibatch(self):
-			if self.agts[0].nn.is_rnn:
+			if self.agt.nn.is_rnn:
 				truetracelengths, minibatch = self.replay_memory.sample_trace(tracelength = self.tracelength)
 			else:
 				truetracelengths, minibatch = self.replay_memory.sample_trace(tracelength = 1)
@@ -159,92 +156,91 @@ class DRQN:
 			if self.use_cero:
 				minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
 
-			for agt in self.agts:
-				# CERO disabled, independently sample for all agents
-				if not self.use_cero:
-					minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
+			# CERO disabled, independently sample for all agents
+			if not self.use_cero:
+				minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
 
-				s_batch = np.vstack([row[agt.i] for row in minibatch[:,0]]) 
-				a_batch = np.vstack([row[agt.i] for row in minibatch[:,1]]) 
-				s_next_batch = np.vstack([row[agt.i] for row in minibatch[:,3]])
-				# if np.count_nonzero(r_batch):
-				# 	print '-----'
-				# 	print "r_batch ",r_batch 
-				# 	print "non_terminal_multiplier",non_terminal_multiplier
-				
-				# Calculate DRQN target
-				feed_dict = {agt.nnT.stateInput : s_next_batch,
-							 agt.nnT.tracelength: self.tracelength,
-							 agt.nnT.truetracelengths: truetracelengths,
-							 agt.nnT.batch_size: self.minibatch_size}
+			agt = self.agt
+			s_batch = np.vstack([row[agt.i] for row in minibatch[:,0]])
+			a_batch = np.vstack([row[agt.i] for row in minibatch[:,1]])
+			s_next_batch = np.vstack([row[agt.i] for row in minibatch[:,3]])
+			# if np.count_nonzero(r_batch):
+			# 	print '-----'
+			# 	print "r_batch ",r_batch
+			# 	print "non_terminal_multiplier",non_terminal_multiplier
 
-				if agt.nnT.is_rnn:
-					rnn_state_train = (np.zeros([self.minibatch_size,agt.nn.h_size]),np.zeros([self.minibatch_size,agt.nn.h_size])) 
-					feed_dict[agt.nnT.rnn_state_in] = rnn_state_train
+			# Calculate DRQN target
+			feed_dict = {agt.nnT.stateInput : s_next_batch,
+						 agt.nnT.tracelength: self.tracelength,
+						 agt.nnT.truetracelengths: truetracelengths,
+						 agt.nnT.batch_size: self.minibatch_size}
 
-				if decision_maker_drqn is not None:
-					# print 'training with decision maker doubling'
-					QMDQRN = self.sess.run(agt.nnT.QValue, feed_dict=feed_dict)
-					
-					# Also need to compose a feed_dict for distiller
-					agt_dec_maker = decision_maker_drqn.agts[agt.i]
-					rnn_state_train_dec_maker = (np.zeros([self.minibatch_size,agt_dec_maker.nn.h_size]),np.zeros([self.minibatch_size,agt_dec_maker.nn.h_size])) 
-					feed_dict_dec_maker = {agt_dec_maker.nn.stateInput : s_next_batch,
-									 	 agt_dec_maker.nn.tracelength: self.tracelength,
-									 	 agt_dec_maker.nn.truetracelengths: truetracelengths,
-									 	 agt_dec_maker.nn.batch_size: self.minibatch_size,
-									 	 agt_dec_maker.nn.rnn_state_in: rnn_state_train_dec_maker}
-					predict_dec_nn_actions = self.sess.run(agt_dec_maker.nn.predict, feed_dict=feed_dict_dec_maker)
-					doubleQ = QMDQRN[range(self.minibatch_size*self.tracelength),predict_dec_nn_actions]
-					y_batch = r_batch + (GAMMA*doubleQ * non_terminal_multiplier)
+			if agt.nnT.is_rnn:
+				rnn_state_train = (np.zeros([self.minibatch_size,agt.nn.h_size]),np.zeros([self.minibatch_size,agt.nn.h_size])) 
+				feed_dict[agt.nnT.rnn_state_in] = rnn_state_train
 
-				if self.double_q_learning:
-					#Below we perform the Double-DQN update to the target Q-values
-					Q2 = self.sess.run(agt.nnT.QValue, feed_dict=feed_dict)
+			if decision_maker_drqn is not None:
+				# print 'training with decision maker doubling'
+				QMDQRN = self.sess.run(agt.nnT.QValue, feed_dict=feed_dict)
 
-					# Also need to compose a feed_dict for agt.nn
-					feed_dict = {agt.nn.stateInput : s_next_batch,
-							 	 agt.nn.tracelength: self.tracelength,
-							 	 agt.nn.truetracelengths: truetracelengths,
-							 	 agt.nn.batch_size: self.minibatch_size}
-					if agt.nn.is_rnn:
-						feed_dict[agt.nn.rnn_state_in] = rnn_state_train
-					predict_nn_actions = self.sess.run(agt.nn.predict, feed_dict=feed_dict)
+				# Also need to compose a feed_dict for distiller
+				agt_dec_maker = decision_maker_drqn.agts[agt.i]
+				rnn_state_train_dec_maker = (np.zeros([self.minibatch_size,agt_dec_maker.nn.h_size]),np.zeros([self.minibatch_size,agt_dec_maker.nn.h_size])) 
+				feed_dict_dec_maker = {agt_dec_maker.nn.stateInput : s_next_batch,
+										agt_dec_maker.nn.tracelength: self.tracelength,
+										agt_dec_maker.nn.truetracelengths: truetracelengths,
+										agt_dec_maker.nn.batch_size: self.minibatch_size,
+										agt_dec_maker.nn.rnn_state_in: rnn_state_train_dec_maker}
+				predict_dec_nn_actions = self.sess.run(agt_dec_maker.nn.predict, feed_dict=feed_dict_dec_maker)
+				doubleQ = QMDQRN[range(self.minibatch_size*self.tracelength),predict_dec_nn_actions]
+				y_batch = r_batch + (GAMMA*doubleQ * non_terminal_multiplier)
 
-					doubleQ = Q2[range(self.minibatch_size*self.tracelength),predict_nn_actions]
-					y_batch = r_batch + (GAMMA*doubleQ * non_terminal_multiplier)
+			if self.double_q_learning:
+				#Below we perform the Double-DQN update to the target Q-values
+				Q2 = self.sess.run(agt.nnT.QValue, feed_dict=feed_dict)
 
-				else:
-					QmaxT = agt.nnT.Qmax.eval(feed_dict=feed_dict)
-					y_batch = r_batch + (GAMMA*QmaxT * non_terminal_multiplier)
-
-				# Train
-				feed_dict={agt.nn.yInput : y_batch,
-							agt.nn.actionInput : a_batch,
-							agt.nn.stateInput : s_batch,
-							agt.nn.tracelength: self.tracelength,
-							agt.nn.truetracelengths: truetracelengths,
-							agt.nn.batch_size: self.minibatch_size}
-
-				# Q = agt.nn.Q_Action.eval(feed_dict = feed_dict)
-				# print Q
-
+				# Also need to compose a feed_dict for agt.nn
+				feed_dict = {agt.nn.stateInput : s_next_batch,
+							 agt.nn.tracelength: self.tracelength,
+							 agt.nn.truetracelengths: truetracelengths,
+							 agt.nn.batch_size: self.minibatch_size}
 				if agt.nn.is_rnn:
 					feed_dict[agt.nn.rnn_state_in] = rnn_state_train
+				predict_nn_actions = self.sess.run(agt.nn.predict, feed_dict=feed_dict)
 
-				# seqlen_mask = self.sess.run(agt.nn.seqlen_mask, feed_dict=feed_dict)
-				# print truetracelengths
-				# print seqlen_mask
+				doubleQ = Q2[range(self.minibatch_size*self.tracelength),predict_nn_actions]
+				y_batch = r_batch + (GAMMA*doubleQ * non_terminal_multiplier)
 
-				# print agt.nn.td_err.eval(feed_dict = feed_dict)
-				agt.nn.trainStep.run(feed_dict = feed_dict)
+			else:
+				QmaxT = agt.nnT.Qmax.eval(feed_dict=feed_dict)
+				y_batch = r_batch + (GAMMA*QmaxT * non_terminal_multiplier)
 
-				
-				# Delay in a target network update - to improve learning stability
-				# TODO 2017 I believe target copy needs to happen just once in parameter sharing case, after final agent's update only
-				if timestep % TARGET_Q_UPDATE_FREQ == 0:
-					assert agt.nnT != None
-					agt.nnT.run_copy()
+			# Train
+			feed_dict={agt.nn.yInput : y_batch,
+						agt.nn.actionInput : a_batch,
+						agt.nn.stateInput : s_batch,
+						agt.nn.tracelength: self.tracelength,
+						agt.nn.truetracelengths: truetracelengths,
+						agt.nn.batch_size: self.minibatch_size}
+
+			# Q = agt.nn.Q_Action.eval(feed_dict = feed_dict)
+			# print Q
+
+			if agt.nn.is_rnn:
+				feed_dict[agt.nn.rnn_state_in] = rnn_state_train
+
+			# seqlen_mask = self.sess.run(agt.nn.seqlen_mask, feed_dict=feed_dict)
+			# print truetracelengths
+			# print seqlen_mask
+
+			# print agt.nn.td_err.eval(feed_dict = feed_dict)
+			agt.nn.trainStep.run(feed_dict = feed_dict)
+
+			# Delay in a target network update - to improve learning stability
+			# TODO 2017 I believe target copy needs to happen just once in parameter sharing case, after final agent's update only
+			if timestep % TARGET_Q_UPDATE_FREQ == 0:
+				assert agt.nnT != None
+				agt.nnT.run_copy()
 		
 		self.log_training_phase(timestep)
 

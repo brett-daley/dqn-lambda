@@ -22,7 +22,7 @@ class DQNManager:
 		# There should definitely be one DRQN handler per game, since each one has a distinct e-greedy epsilon etc.
 		for i_game, game in enumerate(game_mgr.games):
 			# The scope should be unique and identify the teacher network ID (done here) and agent ID (done in DRQN)
-			self.dqns_all.append(DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, agts=game.agts))
+			self.dqns_all.append(DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, agt=game.agt))
 
 		# Create a list of trainable teacher task variables, so TfSaver can later save and restore them
 		if n_teacher_dqns > 0:
@@ -33,8 +33,7 @@ class DQNManager:
 
 		# Note: distillation assumes the inputs/outputs are homogeneous across all games (but can still be heterogeneous across all agents)
 		if enable_distiller:
-			self.distiller = Distiller(cfg_parser = cfg_parser, sess = self.sess, n_actions = n_actions, 
-										dim_obs_agts = [agt.dim_obs for agt in game_mgr.games[0].agts])
+			self.distiller = Distiller(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, dim_obs_agts=[game_mgr.games[0].agt.dim_obs])
 			self.all_vars = [v for v in tf.trainable_variables()]
 
 			self.distiller_companion = None # Such that KL distillation training gets a None input for its companion, if no double distillation
@@ -69,21 +68,19 @@ class DQNManager:
 			if decision_maker_drqn is None:
 				# Use MDRQN for decision-making as well as MRDQN agent (since RNN is stored inside it)
 				cur_dqn = self.mdrqn
-				cur_agts = self.mdrqn.agts
+				cur_agt = self.mdrqn.agts
 			else:
 				# Distiller-mimicer case, where usually the distillaton policy is passed in to take actions and make decisions
 				cur_dqn = self.dqns_all[game.i_game]
-				cur_agts = decision_maker_drqn.agts
+				cur_agt = decision_maker_drqn.agts
 				epsilon = epsilon_forced # decision_maker_drqn.epsilon # exploration for both distillation and mdrqn cases
 			# epsilon = None
 		else:
 			# Use regular DQN and regular game agents
 			cur_dqn = self.dqns_all[game.i_game]
-			cur_agts = game.agts
+			cur_agt = game.agt
 
-		for agt in cur_agts:							
-			cur_agt_action, cur_agt_qvalues = cur_dqn.get_action(epsilon = epsilon, agt = agt, timestep = timestep, 
-																input_obs = cur_joint_obs[agt.i], test_mode = test_mode, i_game = game.i_game)
+			cur_agt_action, cur_agt_qvalues = cur_dqn.get_action(epsilon=epsilon, agt=cur_agt, timestep=timestep, input_obs=cur_joint_obs[cur_agt.i], test_mode=test_mode, i_game=game.i_game)
 
 			joint_i_actions.append(cur_agt_action)
 			if is_distillation_phase:
@@ -177,8 +174,7 @@ class DQNManager:
 		q_value_traj = Data2DTraj()
 		# init_q_value_traj = Data2DTraj()
 		init_q_value_traj = list()
-		for agt in game.agts:
-			init_q_value_traj.append(Data2DTraj())
+		init_q_value_traj.append(Data2DTraj())
 		joint_value_traj = Data2DTraj()
 
 		game.init_agts_nnTs()
@@ -217,11 +213,10 @@ class DQNManager:
 			if i_train_steps>n_train_step_plot_game:
 				self.show_game(game = game, i_game = i_game, dqn = self.dqns_all[i_game])
 
-			if n_games_complete == 1 or n_games_complete % 50 == 0: 
-				for agt in game.agts:
-					joint_value_mean, joint_value_stdev, init_q_mean, init_q_stdev = self.benchmark_singletask_perf(game = game, i_train_steps = i_training_epoch, i_agt_to_plot = agt.i)
-					joint_value_traj.appendToTraj(i_training_epoch, joint_value_mean, joint_value_stdev)
-					init_q_value_traj[agt.i].appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
+			if n_games_complete == 1 or n_games_complete % 50 == 0:
+				joint_value_mean, joint_value_stdev, init_q_mean, init_q_stdev = self.benchmark_singletask_perf(game=game, i_train_steps=i_training_epoch, i_agt_to_plot=game.agt.i)
+				joint_value_traj.appendToTraj(i_training_epoch, joint_value_mean, joint_value_stdev)
+				init_q_value_traj[game.agt.i].appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
 
 		return q_value_traj, joint_value_traj, init_q_value_traj
 			
@@ -317,9 +312,8 @@ class DQNManager:
 
 		# Initial states and actions taken -- for plotting predicted value against actual
 		n_episodes = 50
-		i_agt_to_plot = i_agt_to_plot
-		s_batch_initial = np.zeros((n_episodes, self.dqns_all[game.i_game].agts[0].dim_obs))
-		a_batch_initial = np.zeros((n_episodes, self.dqns_all[game.i_game].agts[0].n_actions))
+		s_batch_initial = np.zeros((n_episodes, self.dqns_all[game.i_game].agt.dim_obs))
+		a_batch_initial = np.zeros((n_episodes, self.dqns_all[game.i_game].agt.n_actions))
 
 		for i_episode in xrange(0,n_episodes):
 			# Reset the game just in case anyone else was handling the game prior or forgot to reset RNN state. It should not hurt.
@@ -340,7 +334,7 @@ class DQNManager:
 		joint_values_mean = np.mean(values_all)
 		joint_values_stdev = np.std(values_all)
 
-		x, init_q_mean, init_q_stdev = self.dqns_all[game.i_game].update_Q_plot(timestep = i_train_steps, i_agt_to_plot = i_agt_to_plot, s_batch_prespecified = s_batch_initial, a_batch_prespecified = a_batch_initial)
+		x, init_q_mean, init_q_stdev = self.dqns_all[game.i_game].update_Q_plot(timestep=i_train_steps, s_batch_prespecified=s_batch_initial, a_batch_prespecified=a_batch_initial)
 		self.dqns_all[game.i_game].plot_value_dqn.update(hl_name = 'game_' + str(game.i_game), label = 'Task ' + str(game.i_game), x_new = i_train_steps, y_new = joint_values_mean, y_stdev_new = joint_values_stdev, init_at_origin = False)
 
 		return joint_values_mean, joint_values_stdev, init_q_mean, init_q_stdev
@@ -429,7 +423,7 @@ class GameManager:
 				self.games.append(TargetPursuit(cfg_parser=cfg_parser, game_variant=variant, sess=sess))
 				
 			# Assuming actions and observation dimensions are consistent across games
-			self.n_actions = self.games[0].agts[0].n_actions 
+			self.n_actions = self.games[0].agt.n_actions
 			# self.dim_agt_obs = self.games[0].dim_agt_obs
 
 		print self.n_game_variants 
