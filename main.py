@@ -5,7 +5,8 @@ import numpy as np
 from random import randint
 import time
 import tensorflow as tf
-from DQNManager import DQNManager, GameManager
+from DQNManager import DQNManager
+from GameManager import GameManager
 import os
 # from configobj import ConfigObj
 from ConfigParser import SafeConfigParser
