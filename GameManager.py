@@ -16,10 +16,10 @@ class GameManager:
             self.n_game_variants += 1
 
             # Single agent target pursuit game
-            if base_game_name == 'SingleAgentSingleTargetPursuit':
+            if base_game_name == 'PursuitEvader':
                 self.games.append(PursuitEvader(cfg_parser = cfg_parser, game_variant = variant, sess = sess))
             # Multiagent target pursuit game
-            elif base_game_name == 'MultiagentTargetPursuit':
+            elif base_game_name == 'TargetPursuit':
                 self.games.append(TargetPursuit(cfg_parser=cfg_parser, game_variant=variant, sess=sess))
 
             # Assuming actions and observation dimensions are consistent across games
