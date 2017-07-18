@@ -29,7 +29,7 @@ class DQNManager:
 			self.teacher_vars = [v for v in tf.trainable_variables()]
 
 		if enable_mdrqn:
-			self.mdrqn = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, is_mdrqn=True,  dim_obs_agts=[agt.dim_obs for agt in game_mgr.games[0].agts])
+			self.mdrqn = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, is_mdrqn=True,  dim_obs_agts=[game_mgr.games[0].agt.dim_obs])
 
 		# Note: distillation assumes the inputs/outputs are homogeneous across all games (but can still be heterogeneous across all agents)
 		if enable_distiller:
@@ -68,7 +68,7 @@ class DQNManager:
 			if decision_maker_drqn is None:
 				# Use MDRQN for decision-making as well as MRDQN agent (since RNN is stored inside it)
 				cur_dqn = self.mdrqn
-				cur_agt = self.mdrqn.agts
+				cur_agt = self.mdrqn.agt
 			else:
 				# Distiller-mimicer case, where usually the distillaton policy is passed in to take actions and make decisions
 				cur_dqn = self.dqns_all[game.i_game]
@@ -80,11 +80,11 @@ class DQNManager:
 			cur_dqn = self.dqns_all[game.i_game]
 			cur_agt = game.agt
 
-			cur_agt_action, cur_agt_qvalues = cur_dqn.get_action(epsilon=epsilon, agt=cur_agt, timestep=timestep, input_obs=cur_joint_obs[cur_agt.i], test_mode=test_mode, i_game=game.i_game)
+		cur_agt_action, cur_agt_qvalues = cur_dqn.get_action(epsilon=epsilon, agt=cur_agt, timestep=timestep, input_obs=cur_joint_obs[cur_agt.i], test_mode=test_mode, i_game=game.i_game)
 
-			joint_i_actions.append(cur_agt_action)
-			if is_distillation_phase:
-				joint_q_values.append(cur_agt_qvalues)
+		joint_i_actions.append(cur_agt_action)
+		if is_distillation_phase:
+			joint_q_values.append(cur_agt_qvalues)
 
 		next_joint_obs, r, terminal, value_so_far = game.next(i_actions = joint_i_actions)
 
@@ -357,10 +357,10 @@ class DQNManager:
 					cur_joint_obs = game.get_joint_obs()
 					joint_i_actions = list()
 
-					for agt_in_game in game.agts:
-						# Distilled policy case, use distilled agent to choose actions, but the actual game agent to get observations and execute action
-						cur_agt_action, cur_agt_qvalues = self.dqns_all[game.i_game].get_action(agt = multitask_dqn.agts[agt_in_game.i], timestep = 9999999, input_obs = cur_joint_obs[agt_in_game.i], test_mode = True)
-						joint_i_actions.append(cur_agt_action)
+					# Distilled policy case, use distilled agent to choose actions, but the actual game agent to get observations and execute action
+					agt_in_game = game.agt
+					cur_agt_action, cur_agt_qvalues = self.dqns_all[game.i_game].get_action(agt=multitask_dqn.agt, timestep=9999999, input_obs=cur_joint_obs[agt_in_game.i], test_mode=True)
+					joint_i_actions.append(cur_agt_action)
 					
 					# Execute the joint action chosen by the distilled polic
 					_, _, terminal, value_so_far = game.next(i_actions = joint_i_actions)

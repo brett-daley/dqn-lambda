@@ -34,12 +34,11 @@ def trainMDRQN(cfg_parser, data_dir):
 	if not os.path.exists(data_dir_mdrqn):
 			os.makedirs(data_dir_mdrqn)
 
-	game_mgr = GameManager(cfg_parser = cfg_parser, sess = sess)
-	dqn_mgr = DQNManager(cfg_parser = cfg_parser, n_teacher_dqns = 0, enable_mdrqn = True, enable_distiller = False,
-						n_actions = game_mgr.n_actions, game_mgr = game_mgr, sess = sess)
+	game_mgr = GameManager(cfg_parser=cfg_parser, sess=sess)
+	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_teacher_dqns=0, enable_mdrqn=True, enable_distiller=False, n_actions=game_mgr.n_actions, game_mgr=game_mgr, sess=sess)
 
-	# Train teacher DQNs	
-	_, multitask_data_dict = dqn_mgr.train_mdrqn(game_mgr = game_mgr, mdrqn = dqn_mgr.mdrqn)#, data_dir = os.path.join(data_dir,'mdqn.txt'))
+	# Train teacher DQNs
+	_, multitask_data_dict = dqn_mgr.train_mdrqn(game_mgr=game_mgr, mdrqn=dqn_mgr.mdrqn)#, data_dir = os.path.join(data_dir,'mdqn.txt'))
 	print '----- MDRQN COMPLETE. Saving multitask game results!'
 	for i_game in xrange(0,len(game_mgr.games)):
 		dir_game_results = os.path.join(data_dir_mdrqn,'mdrqn_jointvalue_game_'+str(i_game)+'.txt')
@@ -137,8 +136,8 @@ def main():
 			print fin.read()
 		print '\n------ Successfully found specified directory and loaded', cfg_path, '\n'
 
-	trainWithDistillation(cfg_parser, data_dir)
-	# trainMDRQN(cfg_parser, data_dir)
+	# trainWithDistillation(cfg_parser, data_dir)
+	trainMDRQN(cfg_parser, data_dir)
 
 if __name__ == '__main__':
 	main()

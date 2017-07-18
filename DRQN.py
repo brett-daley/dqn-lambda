@@ -73,8 +73,7 @@ class DRQN:
 		self.create_mdrqn_nns()
 
 	def reset_agts_rnn_states(self):
-		for agt in self.agts:
-			agt.reset_rnn_state()
+		self.agt.reset_rnn_state()
 
 	def create_mdrqn_nns(self):
 		if self.is_mdrqn:
@@ -84,13 +83,10 @@ class DRQN:
 
 		# Create actual player NNs
 		self.parameter_sharing = False # each agent has its own distilled net for now
-		for agt in self.agts:
-			agt.create_nns(cfg_parser = self.cfg_parser, sess = self.sess, scope_suffix = scope_suffix, 
-							parameter_sharing = self.parameter_sharing, is_distillation_net = self.is_distiller_companion, is_distiller_companion = self.is_distiller_companion)
+		self.agt.create_nns(cfg_parser=self.cfg_parser, sess=self.sess, scope_suffix=scope_suffix, parameter_sharing=self.parameter_sharing, is_distillation_net=self.is_distiller_companion, is_distiller_companion=self.is_distiller_companion)
 
 	def init_agts_nnTs(self):
-		for agt in self.agts:
-				agt.init_nnT()
+		self.agt.init_nnT()
 
 	def update_Q_plot(self, timestep, hl_name=None, label=None, s_batch_prespecified=None, a_batch_prespecified=None):
 		agt = self.agt
