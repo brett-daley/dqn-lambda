@@ -9,7 +9,7 @@ import os
 from LineplotDynamic import LineplotDynamic
 from utils_general import ReplayMemory
 from utils_general import TfSaver
-from GenericAgent import AgentDistilled
+from AgentDistilled import AgentDistilled
 
 # Hyper Parameters:
 GAMMA = 0.95 # decay rate of past observations
@@ -19,7 +19,7 @@ TARGET_Q_UPDATE_FREQ = 1000
 EPS_TEST_TIME = 0.01
 
 class DRQN:
-	def __init__(self, cfg_parser, n_actions, sess, is_mdrqn=False, is_distiller_companion=False, dim_obs_agts=None, agt=None):
+	def __init__(self, cfg_parser, n_actions, sess, dim_obs_agts=None, agt=None):
 		self.cfg_parser = cfg_parser		
 		self.sess = sess
 		
@@ -33,31 +33,15 @@ class DRQN:
 		self.epsilon = EPSILON_INIT
 		self.n_actions = n_actions
 
-		self.is_mdrqn = is_mdrqn # Vanilla MRDQN
-		self.is_distiller_companion = is_distiller_companion # Distiller with MSE for dueling distillation
-		if self.is_mdrqn:
-			assert self.is_distiller_companion is False 
-
-		if self.is_mdrqn or self.is_distiller_companion:
-			# MDRQN mode creates internal agents here, which are shared for ALL games
-			# These are very similar to distiller agents, but use a NN for actual q-learning (rather than distillation)
-			# They also have an internal replay memory which stores experiences from ALL games (unlike the distillation agents)
-			assert dim_obs_agts is not None
-			assert agt is None
-			self.dim_obs_agts = dim_obs_agts
-			self.init_mdrqn_agts()
-		else:
-			self.agt = agt
+		self.agt = agt
 
 		if self.agt.nn.is_rnn:
 			self.tracelength = int(self.cfg_parser.get('root','rnn_train_tracelength'))
-			# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
-			self.replay_memory = ReplayMemory(n_trajs_max = 200, minibatch_size = self.minibatch_size)
-			self.replay_memory_distillation = ReplayMemory(n_trajs_max = 200, minibatch_size = self.minibatch_size, is_distillation_mem = True)
 		else:
 			self.tracelength = 1
-			self.replay_memory = ReplayMemory(n_trajs_max = 200, minibatch_size = self.minibatch_size) 
-			self.replay_memory_distillation = ReplayMemory(n_trajs_max = 200, minibatch_size = self.minibatch_size, is_distillation_mem = True)
+
+		# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
+		self.replay_memory = ReplayMemory(n_trajs_max=200, minibatch_size=self.minibatch_size)
 
 		# Init plotting
 		self.plot_qvalue_dqn = LineplotDynamic('Training Epoch','Q','')
@@ -74,14 +58,9 @@ class DRQN:
 		self.agt.reset_rnn_state()
 
 	def create_mdrqn_nns(self):
-		if self.is_mdrqn:
-			scope_suffix = '_mdrqn'
-		elif self.is_distiller_companion:
-			scope_suffix = '_distiller_mse'
-
 		# Create actual player NNs
 		self.parameter_sharing = False # each agent has its own distilled net for now
-		self.agt.create_nns(cfg_parser=self.cfg_parser, sess=self.sess, scope_suffix=scope_suffix, parameter_sharing=self.parameter_sharing, is_distillation_net=self.is_distiller_companion, is_distiller_companion=self.is_distiller_companion)
+		self.agt.create_nns(cfg_parser=self.cfg_parser, sess=self.sess, scope_suffix=scope_suffix, parameter_sharing=self.parameter_sharing)
 
 	def init_agts_nnTs(self):
 		self.agt.init_nnT()
@@ -143,7 +122,7 @@ class DRQN:
 
 			return minibatch, truetracelengths, r_batch, non_terminal_multiplier
 
-	def train_Q_network(self, timestep, decision_maker_drqn = None):
+	def train_Q_network(self, timestep):
 		if (timestep > self.n_iter_pretrain):
 			# Step 1: sample random minibatch of transitions from replay memory
 			# CERO enabled, simultaneously sample for all agents
@@ -172,22 +151,6 @@ class DRQN:
 			if agt.nnT.is_rnn:
 				rnn_state_train = (np.zeros([self.minibatch_size,agt.nn.h_size]),np.zeros([self.minibatch_size,agt.nn.h_size])) 
 				feed_dict[agt.nnT.rnn_state_in] = rnn_state_train
-
-			if decision_maker_drqn is not None:
-				# print 'training with decision maker doubling'
-				QMDQRN = self.sess.run(agt.nnT.QValue, feed_dict=feed_dict)
-
-				# Also need to compose a feed_dict for distiller
-				agt_dec_maker = decision_maker_drqn.agts[agt.i]
-				rnn_state_train_dec_maker = (np.zeros([self.minibatch_size,agt_dec_maker.nn.h_size]),np.zeros([self.minibatch_size,agt_dec_maker.nn.h_size])) 
-				feed_dict_dec_maker = {agt_dec_maker.nn.stateInput : s_next_batch,
-										agt_dec_maker.nn.tracelength: self.tracelength,
-										agt_dec_maker.nn.truetracelengths: truetracelengths,
-										agt_dec_maker.nn.batch_size: self.minibatch_size,
-										agt_dec_maker.nn.rnn_state_in: rnn_state_train_dec_maker}
-				predict_dec_nn_actions = self.sess.run(agt_dec_maker.nn.predict, feed_dict=feed_dict_dec_maker)
-				doubleQ = QMDQRN[range(self.minibatch_size*self.tracelength),predict_dec_nn_actions]
-				y_batch = r_batch + (GAMMA*doubleQ * non_terminal_multiplier)
 
 			if self.double_q_learning:
 				#Below we perform the Double-DQN update to the target Q-values

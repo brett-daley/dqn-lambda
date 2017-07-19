@@ -9,22 +9,20 @@ from ff_simple_3layer import ff_simple_3layer
 from rnn_simple_2layer import rnn_simple_2layer
 
 # Helper function for defining a unified NN architecture, to allow use in both AgentGround and externally
-def create_specific_nn(cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_distillation_net = False, is_distiller_companion = False, is_target_net = False, src_network = None):
-	if not is_distillation_net:
-		nn_name = cfg_parser.get('root', 'nn_type')
+def create_specific_nn(cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_target_net=False, src_network=None):
+	nn_name = cfg_parser.get('root', 'nn_type')
 
-		# 2 layer ff
-		if nn_name == 'ff_simple_2layer':
-			return ff_simple_2layer(sess = sess,  scope = scope, dim_state_input = dim_state_input, n_actions = n_actions, is_target_net = is_target_net, src_network = src_network)
+	# 2 layer ff
+	if nn_name == 'ff_simple_2layer':
+		return ff_simple_2layer(sess=sess, scope=scope, dim_state_input=dim_state_input, n_actions=n_actions, is_target_net=is_target_net, src_network=src_network)
 
-		# 3 layer ff
-		if nn_name == 'ff_simple_3layer':
-			return ff_simple_3layer(sess = sess,  scope = scope, dim_state_input = dim_state_input, n_actions = n_actions, is_target_net = is_target_net, src_network = src_network)
+	# 3 layer ff
+	if nn_name == 'ff_simple_3layer':
+		return ff_simple_3layer(sess=sess, scope=scope, dim_state_input=dim_state_input, n_actions=n_actions, is_target_net=is_target_net, src_network=src_network)
 
-		# 2 ff + 1 rnn + 1 ff
-		if nn_name == 'rnn_simple_2layer':
-			return rnn_simple_2layer(cfg_parser = cfg_parser, sess = sess, scope = scope, var_reuse = var_reuse, 
-									dim_state_input = dim_state_input, n_actions = n_actions, is_target_net = is_target_net, src_network = src_network)
+	# 2 ff + 1 rnn + 1 ff
+	if nn_name == 'rnn_simple_2layer':
+		return rnn_simple_2layer(cfg_parser=cfg_parser, sess=sess, scope=scope, var_reuse=var_reuse, dim_state_input=dim_state_input, n_actions=n_actions, is_target_net=is_target_net, src_network=src_network)
 
 class TfSaver:
 	def __init__(self, sess, data_dir, vars_to_restore, try_to_restore = True):
@@ -56,17 +54,13 @@ class TfSaver:
 			print "Successfully saved tf session"
 
 class ReplayMemory:
-	def __init__(self, n_trajs_max, minibatch_size, is_distillation_mem = False):
+	def __init__(self, n_trajs_max, minibatch_size):
 		self.minibatch_size = minibatch_size
 		self.traj_mem = []
 		self.n_trajs_max = n_trajs_max
-		self.is_distillation_mem = is_distillation_mem 
 		self.is_traj_pad_elem_calculated = False
 
-		if self.is_distillation_mem:
-			self.mem_tuple_size = 6 #(o,a,r,o',t,q)
-		else:
-			self.mem_tuple_size = 5 #(o,a,r,o',t)
+		self.mem_tuple_size = 5 #(o,a,r,o',t)
 
 	def reset(self):
 		self.traj_mem = []
@@ -108,11 +102,6 @@ class ReplayMemory:
 
 		# Set terminal signal to False
 		self.padding_elem[0][4] = False
-
-		if self.is_distillation_mem:
-			# Set teacher q_values for all agents to 0 vector
-			for i_agt in xrange(0,len(self.padding_elem[0][5])):
-				self.padding_elem[0][5][i_agt] = self.padding_elem[0][5][i_agt]*0.
 
 	# Samples an extended trace from a traj
 	def sample_trace(self, tracelength):

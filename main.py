@@ -27,42 +27,16 @@ def createDataDir():
 
 	return data_dir
 
-def trainMDRQN(cfg_parser, data_dir):
-	# Shared sess object. Each sess assumes exclusive control of resources, can cause conflicts if multiple independent sesss.
-	sess = tf.InteractiveSession()
-	data_dir_mdrqn = os.path.join(data_dir,'mdrqn_results')
-	if not os.path.exists(data_dir_mdrqn):
-			os.makedirs(data_dir_mdrqn)
-
-	game_mgr = GameManager(cfg_parser=cfg_parser, sess=sess)
-	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_teacher_dqns=0, enable_mdrqn=True, enable_distiller=False, n_actions=game_mgr.n_actions, game_mgr=game_mgr, sess=sess)
-
-	# Train teacher DQNs
-	_, multitask_data_dict = dqn_mgr.train_mdrqn(game_mgr=game_mgr, mdrqn=dqn_mgr.mdrqn)#, data_dir = os.path.join(data_dir,'mdqn.txt'))
-	print '----- MDRQN COMPLETE. Saving multitask game results!'
-	for i_game in xrange(0,len(game_mgr.games)):
-		dir_game_results = os.path.join(data_dir_mdrqn,'mdrqn_jointvalue_game_'+str(i_game)+'.txt')
-		print 'Saving ', dir_game_results
-		multitask_data_dict['game_'+str(i_game)].saveData(data_dir = dir_game_results)
-
 def trainWithDistillation(cfg_parser, data_dir):
 	# Shared sess object. Each sess assumes exclusive control of resources, can cause conflicts if multiple independent sesss.
 	sess = tf.InteractiveSession()
 
 	# Init game and DQN
 	game_mgr = GameManager(cfg_parser = cfg_parser, sess = sess)
-	dqn_mgr = DQNManager(cfg_parser = cfg_parser, n_teacher_dqns = len(game_mgr.games), enable_mdrqn = False, enable_distiller = True, enable_double_distiller = False,
-						n_actions = game_mgr.n_actions, game_mgr = game_mgr, sess = sess)
+	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_teacher_dqns=len(game_mgr.games), n_actions=game_mgr.n_actions, game_mgr=game_mgr, sess=sess)
 		
 	# Automatically loads checkpoint if data_dir contains it. Otherwise, starts fresh.
 	tf_saver = TfSaver(sess = sess, data_dir = data_dir, vars_to_restore = dqn_mgr.teacher_vars)
-
-	should_distill = False
-	if should_distill:
-		data_dir_distillation = os.path.join(data_dir,'distilled_results')
-		# Just sets up the saver, but doesn't restore distillation network (so training is done from scratch each time)
-		tf_saver_distillation = TfSaver(sess=sess, data_dir = data_dir_distillation, vars_to_restore = dqn_mgr.all_vars, try_to_restore = False)
-		time.sleep(10)
 	
 	# Skip training if tf_saver loaded pre-trained teachers
 	if not tf_saver.pre_trained:
@@ -84,16 +58,6 @@ def trainWithDistillation(cfg_parser, data_dir):
 			m_plotter.add_data_to_plot(data_dir = data_dir, data_file = 'teacher_jointvalue_game_' + str(i_game) +'.txt', label = 'Task ' + str(i_game))
 			m_plotter.update_legend()
 		plt.show()
-
-	# Distill DQNs
-	if should_distill:
-		multitask_data_dict = dqn_mgr.distill_dqns(game_mgr = game_mgr)
-		print '----- DISTILLATION COMPLETE. Saving multitask game results!'
-		for i_game in xrange(0,len(game_mgr.games)):
-			dir_game_results = os.path.join(data_dir_distillation,'distilled_jointvalue_game_'+str(i_game)+'.txt')
-			print 'Saving ', dir_game_results
-			multitask_data_dict['game_'+str(i_game)].saveData(data_dir = dir_game_results)
-		tf_saver_distillation.save_sess(timestep = 1, save_freq = 1)
 
 def main():
 	data_dir = None # Choose this to train fresh teachers
@@ -136,8 +100,7 @@ def main():
 			print fin.read()
 		print '\n------ Successfully found specified directory and loaded', cfg_path, '\n'
 
-	# trainWithDistillation(cfg_parser, data_dir)
-	trainMDRQN(cfg_parser, data_dir)
+	trainWithDistillation(cfg_parser, data_dir)
 
 if __name__ == '__main__':
 	main()
