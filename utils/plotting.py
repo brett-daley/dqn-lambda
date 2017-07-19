@@ -1,6 +1,5 @@
 import sys
 sys.path.append("nn_archs/")
-sys.path.append("utils/")
 
 import seaborn as sns
 import matplotlib.pyplot as plt

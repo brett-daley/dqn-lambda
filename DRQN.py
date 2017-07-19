@@ -7,8 +7,6 @@ import random
 from collections import deque 
 import os
 from LineplotDynamic import LineplotDynamic
-from ff_distillation_simple_2layer import ff_distillation_simple_2layer
-from ff_distillation_simple_3layer import ff_distillation_simple_3layer
 from utils_general import ReplayMemory
 from utils_general import TfSaver
 from GenericAgent import AgentDistilled
