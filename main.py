@@ -33,30 +33,24 @@ def trainWithDistillation(cfg_parser, data_dir):
 
 	# Init game and DQN
 	game_mgr = GameManager(cfg_parser = cfg_parser, sess = sess)
-	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_teacher_dqns=len(game_mgr.games), n_actions=game_mgr.n_actions, game_mgr=game_mgr, sess=sess)
+	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_actions=game_mgr.n_actions, game_mgr=game_mgr, sess=sess)
 		
 	# Automatically loads checkpoint if data_dir contains it. Otherwise, starts fresh.
 	tf_saver = TfSaver(sess = sess, data_dir = data_dir, vars_to_restore = dqn_mgr.teacher_vars)
 	
 	# Skip training if tf_saver loaded pre-trained teachers
 	if not tf_saver.pre_trained:
-		for i_game, game in enumerate(game_mgr.games):
-			q_value_traj, joint_value_traj, init_q_value_traj = dqn_mgr.train_teacher_dqn(i_game = i_game, game = game)
-			q_value_traj.saveData(data_dir = os.path.join(data_dir,'teacher_qvalue_game_'+str(i_game)+'.txt'))
-			if type(init_q_value_traj) is list:
-				for i_agt, q_values in enumerate(init_q_value_traj):
-					q_values.saveData(data_dir = os.path.join(data_dir,'teacher_init_qvalue_game_'+str(i_game)+'_agt_'+str(i_agt)+'.txt'))
-			else:	
-				init_q_value_traj.saveData(data_dir = os.path.join(data_dir,'teacher_init_qvalue_game_'+str(i_game)+'.txt'))
-			joint_value_traj.saveData(data_dir = os.path.join(data_dir,'teacher_jointvalue_game_'+str(i_game)+'.txt'))
+		q_value_traj, joint_value_traj, init_q_value_traj = dqn_mgr.train_teacher_dqn(game=game_mgr.game)
+		q_value_traj.saveData(data_dir = os.path.join(data_dir,'teacher_qvalue.txt'))
+		init_q_value_traj[0].saveData(data_dir = os.path.join(data_dir,'teacher_init_qvalue.txt'))
+		joint_value_traj.saveData(data_dir = os.path.join(data_dir,'teacher_jointvalue.txt'))
 
 		tf_saver.save_sess(timestep = 1, save_freq = 1)
 	else:
 		m_plotter = Plotter(label_x = 'iter', label_y = 'Actual Value Received', title = '', adjust_right = 0.73)
-		m_plotter.update_palette(len(game_mgr.games))
-		for i_game in xrange(0,len(game_mgr.games)):
-			m_plotter.add_data_to_plot(data_dir = data_dir, data_file = 'teacher_jointvalue_game_' + str(i_game) +'.txt', label = 'Task ' + str(i_game))
-			m_plotter.update_legend()
+		m_plotter.update_palette(n_colors=1)
+		m_plotter.add_data_to_plot(data_dir=data_dir, data_file='teacher_jointvalue.txt', label='Task')
+		m_plotter.update_legend()
 		plt.show()
 
 def main():

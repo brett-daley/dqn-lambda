@@ -18,9 +18,6 @@ class GenericAgent(object):
 		if self.dim_obs is None: # Only need to do this in teacher initialization case. In fact, TODO 2017 I think this can be unified with distilled case, where observation is passed in from DRQNMultiagentManager
 			self.dim_obs = len(self.get_obs(env_s_0))
 
-		if not self.parameter_sharing: 
-			scope_suffix = scope_suffix + "/agt" + str(self.i)
-
 		self.nn = create_specific_nn(cfg_parser=cfg_parser, sess=sess, scope="nn_predict" + scope_suffix, var_reuse=self.parameter_sharing, dim_state_input=self.dim_obs, n_actions=self.n_actions)
 		self.nnT = create_specific_nn(cfg_parser=cfg_parser, sess=sess, scope="nn_target" + scope_suffix, var_reuse=self.parameter_sharing, dim_state_input=self.dim_obs, n_actions=self.n_actions, is_target_net=True, src_network=self.nn)
 

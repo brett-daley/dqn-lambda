@@ -25,7 +25,6 @@ class DRQN:
 		
 		self.n_iter_pretrain = int(self.cfg_parser.get('root','n_iter_pretrain')) # Initial phase where no training occurs. Allows population of replay memory before training.		
 		self.n_iter_explore = int(self.cfg_parser.get('root','n_iter_explore')) # Random policy exploration phase - frames over which to anneal epsilon
-		self.use_cero = self.cfg_parser.getboolean('root','use_cero')
 		self.double_q_learning = self.cfg_parser.getboolean('root','double_q_learning')
 		self.minibatch_size = int(self.cfg_parser.get('root','minibatch_size')) # Size of replay memory transition minibatch in each training phase
 		
@@ -125,13 +124,7 @@ class DRQN:
 	def train_Q_network(self, timestep):
 		if (timestep > self.n_iter_pretrain):
 			# Step 1: sample random minibatch of transitions from replay memory
-			# CERO enabled, simultaneously sample for all agents
-			if self.use_cero:
-				minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
-
-			# CERO disabled, independently sample for all agents
-			if not self.use_cero:
-				minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
+			minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
 
 			agt = self.agt
 			s_batch = np.vstack([row[agt.i] for row in minibatch[:,0]])
@@ -234,7 +227,7 @@ class DRQN:
 		# stateInput is usually a batch input (due to mini-batch training), so [0] at end just grabs the QValue for this single input case
 		return QValue[0]
 
-	def get_action(self, agt, timestep, input_obs, test_mode = False, i_game = None, epsilon = None):
+	def get_action(self, agt, timestep, input_obs, test_mode=False, epsilon=None):
 		if epsilon is not None:
 			epsilon_to_use = epsilon
 		else:
