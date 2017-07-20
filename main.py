@@ -37,7 +37,7 @@ def train(cfg_parser, data_dir):
 
 	# Skip training if tf_saver loaded pre-trained model
 	if not tf_saver.pre_trained:
-		q_value_traj, joint_value_traj, init_q_value_traj = dqn_mgr.train_teacher_dqn(game=game_mgr.game)
+		q_value_traj, joint_value_traj, init_q_value_traj = dqn_mgr.train_dqn(game=game_mgr.game)
 		q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_qvalue.txt'))
 		init_q_value_traj[0].saveData(data_dir=os.path.join(data_dir, 'teacher_init_qvalue.txt'))
 		joint_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_jointvalue.txt'))
