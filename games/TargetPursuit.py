@@ -5,13 +5,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 sns.set_style("whitegrid")
 
-class MultiagentTargetPursuit:
+class TargetPursuit:
 	def __init__(self, cfg_parser, game_variant, sess):
 		self.cfg_parser = cfg_parser
 		self.game_variant = game_variant
 
 		# Domain settings
-		self.n_agts = int(self.cfg_parser.get('root','n_agts'))
 		self.is_toroidal = self.cfg_parser.getboolean('root','is_toroidal')
 		self.max_time_game = int(self.cfg_parser.get('root','max_time_game'))
 		self.parameter_sharing = self.cfg_parser.getboolean('root','parameter_sharing')
@@ -26,9 +25,9 @@ class MultiagentTargetPursuit:
 		keys = [int(k) for k in agent_ids.split(',')]
 		values = [int(v) for v in tgt_ids.split(',')]
 		self.n_tgts = len(set(values))
-		self.agt_to_tgt_map = dict(zip(keys, values))
-		self.tgt_to_agt_map = {v: k for k, v in self.agt_to_tgt_map.iteritems()}
-		assert self.n_agts == len(keys), "n_agts is %d but agt_ids is length %d!" % (self.n_agts, len(keys))
+		self.agt_to_tgt_map = {0: 0}
+		self.tgt_to_agt_map = {v: 0 for v in values}
+		assert 1 == len(keys), "n_agts is 1 but agt_ids is length %d!" % len(keys)
 
 		# Domain settings
 		dim_grid_x = int(self.cfg_parser.get(self.game_variant,'dim_grid_x'))
@@ -79,21 +78,16 @@ class MultiagentTargetPursuit:
 			nn_target_master  = create_specific_nn(cfg_parser = self.cfg_parser, sess = sess, scope = "nn_target"  + scope_suffix, var_reuse = False, dim_state_input = dim_obs, n_actions = n_actions, is_target_net = True, src_network = nn_predict_master)
 
 		# Create actual player NNs
-		for agt in self.agts:
-			agt.create_nns(cfg_parser = self.cfg_parser, sess = sess, scope_suffix = scope_suffix, env_s_0 = self.get_env_state(), parameter_sharing = self.parameter_sharing)
+		self.agt.create_nns(cfg_parser=self.cfg_parser, sess=sess, scope_suffix=scope_suffix, env_s_0=self.get_env_state(), parameter_sharing=self.parameter_sharing)
 
 	def init_agts_nnTs(self):
 		# Placed here since must be run after tf.all_variables_initialized()
-		for agt in self.agts:
-			agt.init_nnT()
+		self.agt.init_nnT()
 
 	def init_agts_tgts(self, sess):
 		# Init agents
-		self.agts = list()
-		for i_agt in xrange(0,self.n_agts):
-			xy_0 = self.get_init_player_state(player_type = 'agent', i_agt = i_agt)
-			self.agts.append(AgentGround(player_type = 'agent', cfg_parser = self.cfg_parser, game_variant = self.game_variant, i_agt = i_agt, n_agts = self.n_agts, xy_0 = xy_0, 
-										x_lim = self.x_lim, y_lim = self.y_lim, is_toroidal = self.is_toroidal, sess = sess))
+		xy_0 = self.get_init_player_state(player_type='agent', i_agt=0)
+		self.agt = AgentGround(player_type='agent', cfg_parser=self.cfg_parser, game_variant=self.game_variant, i_agt=0, n_agts=1, xy_0=xy_0, x_lim=self.x_lim, y_lim=self.y_lim, is_toroidal=self.is_toroidal, sess=sess)
 
 		# Init evaders
 		self.tgts = list()
@@ -110,11 +104,10 @@ class MultiagentTargetPursuit:
 		self.next_joint_o = None # Store the observation to ensure consistency in noise/observation process when querying observations within same timestep
 
 		# Re-initialize agents
-		for agt in self.agts:
-			xy_0 = self.get_init_player_state(player_type = 'agent', i_agt = agt.i)
-			agt.reset_state(xy_0 = xy_0)
-			# Reset RNN state (does nothing for non-RNN case)
-			agt.reset_rnn_state()
+		xy_0 = self.get_init_player_state(player_type='agent', i_agt=self.agt.i)
+		self.agt.reset_state(xy_0=xy_0)
+		# Reset RNN state (does nothing for non-RNN case)
+		self.agt.reset_rnn_state()
 
 		# Re-initialize evaders
 		for tgt in self.tgts:
@@ -132,7 +125,7 @@ class MultiagentTargetPursuit:
 		x, y, z = np.random.random((3, self.n_tgts))
 		self.scat_tgts = self.ax.scatter(x, y, c=z, s=200)
 		
-		x, y, z = np.random.random((3, self.n_agts))
+		x, y, z = np.random.random((3, 1))
 		self.scat_agts = self.ax.scatter(x, y, c=z, s=200)
 
 	def plot(self, t):
@@ -145,22 +138,18 @@ class MultiagentTargetPursuit:
 		plt.draw()
 		plt.pause(0.1)
 	
-	def evaders_captured(self, enforce_simult_capture):
+	def evaders_captured(self):
 		n_times_captured = 0
 
 		# Count # of agents that simultaneously captured the evader in current timestep
-		for agt in self.agts:
-			tgt_id = self.agt_to_tgt_map[agt.i]
-			if np.array_equal(agt.s, self.tgts[tgt_id].get_state_xy()):
-				n_times_captured += 1
+		tgt_id = self.agt_to_tgt_map[self.agt.i]
+		if np.array_equal(self.agt.s, self.tgts[tgt_id].get_state_xy()):
+			n_times_captured += 1
 
 		# if n_times_captured > 0:
 		# 	print n_times_captured
 
-		if (enforce_simult_capture and n_times_captured == self.n_agts) or (not enforce_simult_capture and n_times_captured >= 1):
-			return True
-
-		return False
+		return (n_times_captured == 1)
 
 	def get_env_state(self):
 		# Mostly to make it easier to call agt.get_obs() if the environment state needed for the joint obs changes
@@ -171,7 +160,7 @@ class MultiagentTargetPursuit:
 		# POMDP-ness (to ensure multiple queried observations at same timestep don't change due to noise)
 		if self.next_joint_o is None:
 			# First game timestep, so no preprocessed next_joint_o yet, grab a fresh one
-			return [agt.get_obs(self.get_env_state()) for agt in self.agts]
+			return [self.agt.get_obs(self.get_env_state())]
 		else:
 			# Get pre-processed observation
 			return self.next_joint_o
@@ -180,19 +169,18 @@ class MultiagentTargetPursuit:
 		game_over = False
 		r = 0
 
-		if len(i_actions) < self.n_agts:
-			raise ValueError('Not enough actions specified! %d agents need exactly %d actions!' %(self.n_agts,self.n_agts))
+		if len(i_actions) != 1:
+			raise ValueError('Incorrect number of actions specified! 1 agent needs exactly 1 action!')
 
 		# Game itself propagates (in this case, evader moves)
 		for tgt in self.tgts:
 			tgt.prop_action_evader()
 
 		# Agents execute actions
-		for agt in self.agts:
-			agt.exec_action_agt(one_hot_action = i_actions[agt.i])
+		self.agt.exec_action_agt(one_hot_action=i_actions[self.agt.i])
 
 		# Check if evader was caught
-		if self.evaders_captured(enforce_simult_capture = True):
+		if self.evaders_captured():
 			print '-------------- Evaders caught at timestep', self.time_game, '!--------------'
 			r = 1
 			# Set end_game_on_simult_catch to False to increase success rate (more reward feedback)
@@ -203,13 +191,10 @@ class MultiagentTargetPursuit:
 			game_over = True
 
 		# Save rewards for agents (in case they want to include as part of state)
-		for agt in self.agts:
-			self.last_reward = r
+		self.agt.last_reward = r
 
 		# Pack next joint state
-		self.next_joint_o = [agt.get_obs(self.get_env_state()) for agt in self.agts]
-		
-
+		self.next_joint_o = [self.agt.get_obs(self.get_env_state())]
 
 		# Accrue value
 		self.value += self.discount*r

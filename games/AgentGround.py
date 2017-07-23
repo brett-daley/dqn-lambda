@@ -1,37 +1,36 @@
 import numpy as np
-import time
 from GenericAgent import GenericAgent
 
+
 class AgentGround(GenericAgent):
-	def __init__(self, player_type, cfg_parser, game_variant, i_agt, xy_0, x_lim, y_lim, is_toroidal, n_agts = 0, sess = None, scope_suffix = None, corresponding_agt= None):
+	def __init__(self, player_type, cfg_parser, game_variant, i_agt, xy_0, x_lim, y_lim, is_toroidal, n_agts=0, sess=None, scope_suffix=None, corresponding_agt=None):
 		self.cfg_parser = cfg_parser
 
 		if cfg_parser.has_option('root', 'include_color_obs_and_action'):
-			self.include_color_obs_and_action = self.cfg_parser.getboolean('root','include_color_obs_and_action')
+			self.include_color_obs_and_action = self.cfg_parser.getboolean('root', 'include_color_obs_and_action')
 		else:
 			self.include_color_obs_and_action = False
 
-		if cfg_parser.has_option('root','p_obs_flicker'):
-			self.p_obs_flicker = float(self.cfg_parser.get('root','p_obs_flicker'))
+		if cfg_parser.has_option('root', 'p_obs_flicker'):
+			self.p_obs_flicker = float(self.cfg_parser.get('root', 'p_obs_flicker'))
 			print 'Observation flicker probability', self.p_obs_flicker
 		else:
 			self.p_obs_flicker = 0.
 
 		if cfg_parser.has_option('root', 'obs_include_last_action'):
-			self.obs_include_last_action = self.cfg_parser.getboolean('root','obs_include_last_action')
+			self.obs_include_last_action = self.cfg_parser.getboolean('root', 'obs_include_last_action')
 		else:
 			self.obs_include_last_action = False
 
 		if cfg_parser.has_option('root', 'obs_include_last_reward'):
-			self.obs_include_last_reward = self.cfg_parser.getboolean('root','obs_include_last_reward')
+			self.obs_include_last_reward = self.cfg_parser.getboolean('root', 'obs_include_last_reward')
 		else:
 			self.obs_include_last_reward = False
 
 		if cfg_parser.has_option('root', 'obs_include_agt_id'):
-			self.obs_include_agt_id = self.cfg_parser.getboolean('root','obs_include_agt_id')
+			self.obs_include_agt_id = self.cfg_parser.getboolean('root', 'obs_include_agt_id')
 		else:
 			self.obs_include_agt_id = False
-
 
 		if self.include_color_obs_and_action:
 			self.actions = ['north','east','south','west','wait','observe_tgt_colors']
@@ -39,7 +38,7 @@ class AgentGround(GenericAgent):
 			self.actions = ['north','east','south','west','wait']
 
 		# Keep this here. Order matters.
-		super(self.__class__, self).__init__(i_agt = i_agt, n_actions = len(self.actions))
+		super(self.__class__, self).__init__(i_agt=i_agt, n_actions=len(self.actions))
 
 		self.n_agts = n_agts
 		self.corresponding_agt = corresponding_agt
@@ -48,12 +47,7 @@ class AgentGround(GenericAgent):
 		self.y_lim = y_lim
 		self.x_range = self.x_lim[1]-self.x_lim[0]
 		self.y_range = self.y_lim[1]-self.y_lim[0]
-		self.i_game = int(self.cfg_parser.get(game_variant,'i_game'))
-		
-		# if self.i_game == 0:  # TODO 2017 remove this obs flicker hardcoding! for temporary testing only
-		# 	self.p_obs_flicker = 0.6
-		# else:
-		# 	self.p_obs_flicker = 0.1
+		self.i_game = int(self.cfg_parser.get(game_variant, 'i_game'))
 
 		self.is_toroidal = is_toroidal
 
@@ -87,16 +81,11 @@ class AgentGround(GenericAgent):
 		self.last_reward = 0
 
 	def append_color_state(self):
-		# print 'here1'
-		# print self.s
 		# Each target gets assigned a unique color to help indicate to its pursuing agent which target to try and catch
 		if self.player_type == 'evader' and self.include_color_obs_and_action:
-			self.s = np.append(self.s, self.corresponding_agt+1) # Color state is target corresponding `pursuer' agent's ID + 1 (since 0 is a reserved colorless state)
-		# print self.s
-		# print self.i_game
-		# print '----------'
+			self.s = np.append(self.s, self.corresponding_agt + 1) # Color state is target corresponding `pursuer' agent's ID + 1 (since 0 is a reserved colorless state)
 
-	def post_process_next_state(self,s):
+	def post_process_next_state(self, s):
 		if self.is_toroidal:
 			# Wrap x
 			if s[0] >= self.x_lim[1]:
@@ -115,12 +104,12 @@ class AgentGround(GenericAgent):
 	def exec_action_agt(self, one_hot_action):
 		i_action = np.argmax(one_hot_action)
 		action = self.actions[i_action]
-		
+
 		s_north = self.s + [0,1]
 		s_west = self.s + [-1,0]
 		s_south = self.s + [0,-1]
 		s_east = self.s + [1,0]
-		
+
 		# Calculate possible noisy next states (left/fwd/right)
 		if action == 'north': # North
 			s_next = [s_west, s_north, s_east]
@@ -134,13 +123,11 @@ class AgentGround(GenericAgent):
 			s_next = [self.s]*3
 		else:
 			raise ValueError('[exec_action_agt] Invalid action index!')
-		
+
 		if self.include_color_obs_and_action:
-			if action =='observe_tgt_colors':
+			if action == 'observe_tgt_colors':
 				# Allow next obs of tgt colors
 				self.evader_col_obs_mask = 1.
-				# if self.i_game == 1 and self.i == 1:
-				# print 'game', self.i_game, 'agent', self.i, 'chose to observe target color!!!'
 			else:
 				# Mask next obs of tgt colors
 				self.evader_col_obs_mask = 0.
@@ -154,12 +141,9 @@ class AgentGround(GenericAgent):
 		self.s = self.post_process_next_state(s_next)
 		self.last_action = one_hot_action 
 
-		# print self.s
-		# print '-----------------'
-
 	def get_obs(self, s_evaders):
 		if self.include_color_obs_and_action:
-			assert np.shape(s_evaders)[1] %3 == 0
+			assert np.shape(s_evaders)[1] % 3 == 0
 			xy_evaders = s_evaders[:,:-1]
 			col_evaders = s_evaders[:,-1]
 		else:
@@ -175,11 +159,10 @@ class AgentGround(GenericAgent):
 			obs = np.append(obs, 0.*xy_evaders)
 		else:
 			obs = np.append(obs, 1./self.x_range*xy_evaders)
-		
+
 		# Evader color
 		if self.include_color_obs_and_action:
-			col_evaders = np.reshape(np.eye(len(col_evaders))[col_evaders-1],-1) # Assumes one evader per agent!
-			# print 'cold_evaders', col_evaders, ' col_eveaders onehot', col_evaders
+			col_evaders = np.reshape(np.eye(len(col_evaders))[col_evaders-1], -1) # Assumes one evader per agent!
 			obs = np.append(obs, col_evaders*self.evader_col_obs_mask)
 			self.evader_col_obs_mask = 0.
 		
