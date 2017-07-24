@@ -45,7 +45,7 @@ class DQNManager:
 		init_q_value_traj = [Data2DTraj()]
 		joint_value_traj = Data2DTraj()
 
-		game.init_agts_nnTs()
+		game.init_agt_nnT()
 
 		n_games_complete = 0
 
@@ -77,9 +77,6 @@ class DQNManager:
 			# Once game completes, add entire trajectory to replay memory
 			n_games_complete += 1
 			self.dqn.replay_memory.add(joint_sarsa_traj)
-
-			if i_train_steps > n_train_step_plot_game:
-				self.show_game(game=game, dqn=self.dqn)
 
 			if n_games_complete == 1 or n_games_complete % 50 == 0:
 				joint_value_mean, joint_value_stdev, init_q_mean, init_q_stdev = self.benchmark_singletask_perf(game=game, i_train_steps=i_training_epoch)
@@ -120,18 +117,3 @@ class DQNManager:
 		self.dqn.plot_value_dqn.update(hl_name='Game', label='Task', x_new=i_train_steps, y_new=joint_values_mean, y_stdev_new=joint_values_stdev, init_at_origin=False)
 
 		return joint_values_mean, joint_values_stdev, init_q_mean, init_q_stdev
-
-	def show_game(self, game, dqn):
-		terminal = False
-		game.reset_game()
-
-		for i in xrange(100):
-			cur_joint_obs = game.get_joint_obs()
-			cur_agt_action, cur_agt_qvalues = self.dqn.get_action(agt=game.agt, timestep=-1, input_obs=cur_joint_obs[0], test_mode=True)
-			joint_i_actions = [cur_agt_action]
-			game.next(i_actions=joint_i_actions)
-
-			game.plot(0)
-
-			if terminal:
-				time.sleep(2)

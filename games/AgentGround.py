@@ -3,7 +3,7 @@ from GenericAgent import GenericAgent
 
 
 class AgentGround(GenericAgent):
-	def __init__(self, player_type, cfg_parser, game_variant, i_agt, xy_0, x_lim, y_lim, is_toroidal, n_agts=0, sess=None, scope_suffix=None, corresponding_agt=None):
+	def __init__(self, player_type, cfg_parser, i_agt, xy_0, x_lim, y_lim, is_toroidal, n_agts=0, sess=None, scope_suffix=None, corresponding_agt=None):
 		self.cfg_parser = cfg_parser
 
 		if cfg_parser.has_option('root', 'include_color_obs_and_action'):
@@ -47,7 +47,6 @@ class AgentGround(GenericAgent):
 		self.y_lim = y_lim
 		self.x_range = self.x_lim[1]-self.x_lim[0]
 		self.y_range = self.y_lim[1]-self.y_lim[0]
-		self.i_game = int(self.cfg_parser.get(game_variant, 'i_game'))
 
 		self.is_toroidal = is_toroidal
 
@@ -180,8 +179,7 @@ class AgentGround(GenericAgent):
 		# Target is autonomous, so propagates itself using its own policy
 
 		# Example policy: move horizontally. Can include more complex target policies here.
-		if self.i_game == 0:
-			self.s[0] += 1
+		self.s[0] += 1
 
 		# Ensure state follows game dynamics (e.g., toroidal grid etc.)
 		self.s = self.post_process_next_state(self.s)

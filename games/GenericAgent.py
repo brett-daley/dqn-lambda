@@ -15,7 +15,7 @@ class GenericAgent(object):
 		self.parameter_sharing = parameter_sharing
 
 		if self.dim_obs is None:
-			self.dim_obs = len(self.get_obs(env_s_0))
+			self.dim_obs = len(env_s_0)
 
 		self.nn = create_specific_nn(cfg_parser=cfg_parser, sess=sess, scope='nn_predict' + scope_suffix, var_reuse=self.parameter_sharing, dim_state_input=self.dim_obs, n_actions=self.n_actions)
 		self.nnT = create_specific_nn(cfg_parser=cfg_parser, sess=sess, scope='nn_target' + scope_suffix, var_reuse=self.parameter_sharing, dim_state_input=self.dim_obs, n_actions=self.n_actions, is_target_net=True, src_network=self.nn)
