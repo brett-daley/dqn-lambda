@@ -38,7 +38,6 @@ class DQNManager:
 		i_train_steps = 0
 		i_training_epoch = 0
 		n_train_steps = int(self.cfg_parser.get('root', 'n_train_steps'))
-		n_train_step_plot_game = int(self.cfg_parser.get('root', 'n_train_step_plot_game'))
 		minibatch_size = int(self.cfg_parser.get('root', 'minibatch_size'))
 
 		q_value_traj = Data2DTraj()

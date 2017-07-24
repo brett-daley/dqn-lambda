@@ -11,7 +11,8 @@ class Network(object):
 		self.var = {}
 
 		self.hysteretic_q_learning = self.cfg_parser.getboolean('root', 'hysteretic_q_learning')
-		self.hql_alpha = float(self.cfg_parser.get('root', 'hql_alpha'))
+		if self.hysteretic_q_learning:
+			self.hql_alpha = float(self.cfg_parser.get('root', 'hql_alpha'))
 
 	def run_copy(self):
 		if self.copy_op is None:

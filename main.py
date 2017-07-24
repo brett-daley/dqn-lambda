@@ -56,7 +56,7 @@ def main():
 
 	# data_dir is empty, so train for new game
 	if not data_dir:
-		cfg_ini = 'config_TargetPursuit_2.ini'
+		cfg_ini = 'config_Atari.ini'
 
 		# Read the config file and create a data directory for it
 		cfg_parser = get_cfg_parser(os.path.join('./games/', cfg_ini))

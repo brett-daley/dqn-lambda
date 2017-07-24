@@ -7,7 +7,7 @@ class Atari:
 	def __init__(self, cfg_parser, sess):
 		self.cfg_parser = cfg_parser
 
-		self.env_name = 'Pong-ram-v0'
+		self.env_name = self.cfg_parser.get('root', 'env_name')
 		self.env = gym.make(self.env_name)
 		self.obs = self.env.reset()
 
