@@ -4,7 +4,7 @@ sys.path.append('utils/')
 import time
 import tensorflow as tf
 from DQNManager import DQNManager
-from GameManager import GameManager
+from Atari import Atari
 import os
 from ConfigParser import SafeConfigParser
 from utils_general import TfSaver
@@ -29,15 +29,15 @@ def train(cfg_parser, data_dir):
 	sess = tf.InteractiveSession()
 
 	# Init game and DQN
-	game_mgr = GameManager(cfg_parser=cfg_parser, sess=sess)
-	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_actions=game_mgr.n_actions, game_mgr=game_mgr, sess=sess)
+	game = Atari(cfg_parser=cfg_parser, sess=sess)
+	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_actions=game.n_actions, game=game, sess=sess)
 
 	# Automatically loads checkpoint if data_dir contains it. Otherwise, starts fresh.
 	tf_saver = TfSaver(sess=sess, data_dir=data_dir, vars_to_restore=dqn_mgr.teacher_vars)
 
 	# Skip training if tf_saver loaded pre-trained model
 	if not tf_saver.pre_trained:
-		q_value_traj, joint_value_traj, init_q_value_traj = dqn_mgr.train_dqn(game=game_mgr.game)
+		q_value_traj, joint_value_traj, init_q_value_traj = dqn_mgr.train_dqn(game)
 		q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_qvalue.txt'))
 		init_q_value_traj[0].saveData(data_dir=os.path.join(data_dir, 'teacher_init_qvalue.txt'))
 		joint_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_jointvalue.txt'))

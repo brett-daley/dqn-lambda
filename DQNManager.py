@@ -6,11 +6,11 @@ import time
 
 
 class DQNManager:
-	def __init__(self, cfg_parser, n_actions, game_mgr, sess):
+	def __init__(self, cfg_parser, n_actions, game, sess):
 		self.cfg_parser = cfg_parser
 		self.sess = sess
 
-		self.dqn = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, agt=game_mgr.game.agt)
+		self.dqn = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, agt=game.agt)
 
 		# Create a list of trainable teacher task variables, so TfSaver can later save and restore them
 		self.teacher_vars = [v for v in tf.trainable_variables()]
