@@ -80,7 +80,7 @@ class DQNManager:
 			if n_games_complete == 1 or n_games_complete % 50 == 0:
 				joint_value_mean, joint_value_stdev, init_q_mean, init_q_stdev = self.benchmark_singletask_perf(game=game, i_train_steps=i_training_epoch)
 				joint_value_traj.appendToTraj(i_training_epoch, joint_value_mean, joint_value_stdev)
-				init_q_value_traj[game.agt.i].appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
+				init_q_value_traj[0].appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
 
 		return q_value_traj, joint_value_traj, init_q_value_traj
 

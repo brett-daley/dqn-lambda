@@ -1,4 +1,4 @@
-from AgentGround import AgentGround
+from Agent import Agent
 import numpy as np
 import gym
 
@@ -9,6 +9,7 @@ class Atari:
 
 		self.env_name = self.cfg_parser.get('root', 'env_name')
 		self.env = gym.make(self.env_name)
+		self.n_actions = self.env.action_space.n
 		self.obs = self.env.reset()
 
 		# TODO 2017 make this a parameter/handled automatically in the game
@@ -25,7 +26,7 @@ class Atari:
 
 	def create_agt_nn(self, sess):
 		# Create actual player NNs
-		self.agt.create_nns(cfg_parser=self.cfg_parser, sess=sess, scope_suffix='', env_s_0=self.obs, parameter_sharing=False)
+		self.agt.create_nns(cfg_parser=self.cfg_parser, sess=sess, scope_suffix='', parameter_sharing=False)
 
 	def init_agt_nnT(self):
 		# Placed here since must be run after tf.all_variables_initialized()
@@ -33,7 +34,7 @@ class Atari:
 
 	def init_agt(self, sess):
 		# Init agents
-		self.agt = AgentGround(player_type='agent', cfg_parser=self.cfg_parser, i_agt=0, n_agts=1, xy_0=[0,0], x_lim=[-1,1], y_lim=[-1,1], is_toroidal=False, sess=sess)
+		self.agt = Agent(self.n_actions, dim_obs=len(self.obs))
 
 	def reset_game(self):
 		self.discount = 1.0
