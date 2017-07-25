@@ -53,7 +53,7 @@ class rnn_simple_2layer(Network):
 	def create_Q_network(self):
 		with tf.variable_scope(self.scope, reuse=self.var_reuse):
 			# INPUT stateInput, I think each batch is technically batchsize*tracelength, so the input is a vstacked [batchsize*tracelength, input_dim] in dimension
-			self.stateInput = tf.placeholder(tf.float32, [None, self.dim_state_input], name='stateInput')
+			self.stateInput = tf.placeholder(tf.float32, [None] + list(self.dim_state_input), name='stateInput')
 			self.tracelength = tf.placeholder(dtype=tf.int32, name='tracelength')
 			self.batch_size = tf.placeholder(dtype=tf.int32, name='batch_size')
 			self.truetracelengths = tf.placeholder(tf.int32, [None], name='truetracelengths') # traces are varying length, this [batch_size] vector specifies the true length for each trace in the batch
@@ -61,7 +61,7 @@ class rnn_simple_2layer(Network):
 			weights_initializer = tf.contrib.layers.xavier_initializer()
 
 			n_hidden = 32
-			net = slim.fully_connected(inputs=self.stateInput, num_outputs=n_hidden,
+			net = slim.fully_connected(inputs=tf.contrib.layers.flatten(self.stateInput), num_outputs=n_hidden,
 										activation_fn=tf.nn.relu, weights_initializer=weights_initializer,
 										biases_initializer=tf.constant_initializer(value=0.01),
 										trainable=self.trainable)

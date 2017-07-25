@@ -55,8 +55,8 @@ class DRQN:
 		if s_batch_prespecified is None:
 			# Since tracelength of 1 used, this ensures that truetracelengths = [1,....,1] and no masking required below
 			_, minibatch = self.replay_memory.sample_trace(tracelength=1)
-			s_batch = np.vstack([row[0] for row in minibatch[:,0]])
-			a_batch = np.vstack([row[0] for row in minibatch[:,1]])
+			s_batch = np.vstack([row for row in minibatch[:,0]])
+			a_batch = np.vstack([row for row in minibatch[:,1]])
 			minibatch_size_plot = self.minibatch_size
 		else:
 			s_batch = s_batch_prespecified
@@ -104,9 +104,9 @@ class DRQN:
 			minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
 
 			agt = self.agt
-			s_batch = np.vstack([row[agt.i] for row in minibatch[:,0]])
-			a_batch = np.vstack([row[agt.i] for row in minibatch[:,1]])
-			s_next_batch = np.vstack([row[agt.i] for row in minibatch[:,3]])
+			s_batch = np.vstack([row for row in minibatch[:,0]])
+			a_batch = np.vstack([row for row in minibatch[:,1]])
+			s_next_batch = np.vstack([row for row in minibatch[:,3]])
 
 			# Calculate DRQN target
 			feed_dict = {agt.nnT.stateInput: s_next_batch,

@@ -34,7 +34,7 @@ class Atari:
 
 	def init_agt(self, sess):
 		# Init agents
-		self.agt = Agent(self.n_actions, dim_obs=len(self.obs))
+		self.agt = Agent(self.n_actions, dim_obs=self.obs.shape)
 
 	def reset_game(self):
 		self.discount = 1.0

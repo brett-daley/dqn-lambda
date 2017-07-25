@@ -90,7 +90,7 @@ class DQNManager:
 
 		# Initial states and actions taken -- for plotting predicted value against actual
 		n_episodes = 50
-		s_batch_initial = np.zeros((n_episodes, self.dqn.agt.dim_obs))
+		s_batch_initial = np.zeros([n_episodes] + list(self.dqn.agt.dim_obs))
 		a_batch_initial = np.zeros((n_episodes, self.dqn.agt.n_actions))
 
 		for i_episode in xrange(n_episodes):
