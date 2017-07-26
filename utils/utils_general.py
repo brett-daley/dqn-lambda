@@ -9,7 +9,7 @@ from conv_3layer import conv_3layer
 
 # Helper function for defining a unified NN architecture, to allow use in both AgentGround and externally
 def create_specific_nn(cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_target_net=False, src_network=None):
-	nn_arch = cfg_parser.get('root', 'nn_arch')
+	nn_arch = cfg_parser.get('nn', 'arch')
 
 	# 2 ff + 1 rnn + 1 ff
 	if nn_arch == 'rnn_simple_2layer':

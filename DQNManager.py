@@ -37,8 +37,8 @@ class DQNManager:
 		train_freq = 5
 		i_train_steps = 0
 		i_training_epoch = 0
-		n_train_steps = int(self.cfg_parser.get('root', 'n_train_steps'))
-		minibatch_size = int(self.cfg_parser.get('root', 'minibatch_size'))
+		n_train_steps = int(self.cfg_parser.get('env', 'n_train_steps'))
+		minibatch_size = int(self.cfg_parser.get('dqn', 'minibatch_size'))
 
 		q_value_traj = Data2DTraj()
 		init_q_value_traj = [Data2DTraj()]

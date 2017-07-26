@@ -37,12 +37,7 @@ class rnn_simple_2layer(Network):
 		seqlen_mask = tf.slice(tf.gather(lower_triangular_ones, self.truetracelengths - 1), [0, 0], [self.batch_size, self.tracelength])
 		self.seqlen_mask = tf.reshape(seqlen_mask, [-1])
 
-		# Hysteretic Q-learning (set alpha = 1 for decentralized Q-learning)
 		self.td_err = self.yInput - self.Q_Action
-
-		if self.hysteretic_q_learning:
-			self.td_err = tf.maximum(self.hql_alpha * self.td_err, self.td_err)
-
 		self.cost = tf.reduce_mean(tf.square(self.td_err) * self.seqlen_mask)
 
 		self.trainStep = tf.train.AdamOptimizer(learning_rate=0.001).minimize(self.cost)

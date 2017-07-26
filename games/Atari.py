@@ -7,12 +7,12 @@ class Atari:
 	def __init__(self, cfg_parser, sess):
 		self.cfg_parser = cfg_parser
 
-		self.env_name = self.cfg_parser.get('root', 'env_name')
+		self.env_name = self.cfg_parser.get('env', 'name')
 		self.env = gym.make(self.env_name)
 		self.n_actions = self.env.action_space.n
 		self.obs = self.env.reset()
 
-		self.discount_factor = float(self.cfg_parser.get('root', 'discount'))
+		self.discount_factor = float(self.cfg_parser.get('dqn', 'discount'))
 
 		# Init agents/evader
 		self.init_agt(sess=sess)

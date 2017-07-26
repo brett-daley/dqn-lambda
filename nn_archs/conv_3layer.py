@@ -7,7 +7,7 @@ import tensorflow.contrib.layers as layers
 class conv_3layer(Network):
 	def __init__(self, cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_rnn=False, is_target_net=False, src_network=None):
 		super(self.__class__, self).__init__(cfg_parser, sess, scope, trainable=(not is_target_net))
-		self.is_rnn = cfg_parser.getboolean('root', 'make_recurrent')
+		self.is_rnn = cfg_parser.getboolean('nn', 'recurrent')
 		self.dim_state_input = dim_state_input
 		self.n_actions = n_actions
 		self.var_reuse = var_reuse
@@ -37,12 +37,7 @@ class conv_3layer(Network):
 		seqlen_mask = tf.slice(tf.gather(lower_triangular_ones, self.truetracelengths - 1), [0, 0], [self.batch_size, self.tracelength])
 		self.seqlen_mask = tf.reshape(seqlen_mask, [-1])
 
-		# Hysteretic Q-learning (set alpha = 1 for decentralized Q-learning)
 		self.td_err = self.yInput - self.Q_Action
-
-		if self.hysteretic_q_learning:
-			self.td_err = tf.maximum(self.hql_alpha * self.td_err, self.td_err)
-
 		self.cost = tf.reduce_mean(tf.square(self.td_err) * self.seqlen_mask)
 
 		self.trainStep = tf.train.AdamOptimizer(learning_rate=0.001).minimize(self.cost)

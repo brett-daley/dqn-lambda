@@ -1,5 +1,4 @@
 import sys
-sys.path.append('nn_archs/')
 import numpy as np
 import random
 import os
@@ -12,16 +11,19 @@ class DRQN:
 		self.cfg_parser = cfg_parser
 		self.sess = sess
 
-		self.n_iter_pretrain = int(self.cfg_parser.get('root', 'n_iter_pretrain')) # Initial phase where no training occurs. Allows population of replay memory before training.
-		self.n_iter_explore = int(self.cfg_parser.get('root', 'n_iter_explore')) # Random policy exploration phase - frames over which to anneal epsilon
-		self.double_q_learning = self.cfg_parser.getboolean('root', 'double_q_learning')
-		self.minibatch_size = int(self.cfg_parser.get('root', 'minibatch_size')) # Size of replay memory transition minibatch in each training phase
+		# Initial phase where no training occurs. Allows population of replay memory before training.
+		self.n_pretrain_steps = int(self.cfg_parser.get('env', 'n_pretrain_steps'))
+		# Random policy exploration phase - frames over which to anneal epsilon
+		self.n_explore_steps = int(self.cfg_parser.get('env', 'n_explore_steps'))
+		self.double_q_learning = self.cfg_parser.getboolean('dqn', 'double_q_learning')
+		# Size of replay memory transition minibatch in each training phase
+		self.minibatch_size = int(self.cfg_parser.get('dqn', 'minibatch_size'))
 
-		self.discount = float(self.cfg_parser.get('root', 'discount'))
-		self.epsilon_init = float(self.cfg_parser.get('root', 'epsilon_init'))
-		self.epsilon_final = float(self.cfg_parser.get('root', 'epsilon_final'))
-		self.target_q_update_period = int(self.cfg_parser.get('root', 'target_q_update_period'))
-		self.eps_test_time = float(self.cfg_parser.get('root', 'eps_test_time'))
+		self.discount = float(self.cfg_parser.get('dqn', 'discount'))
+		self.epsilon_init = float(self.cfg_parser.get('dqn', 'epsilon_init'))
+		self.epsilon_final = float(self.cfg_parser.get('dqn', 'epsilon_final'))
+		self.target_q_update_period = int(self.cfg_parser.get('dqn', 'target_q_update_period'))
+		self.epsilon_test_time = float(self.cfg_parser.get('dqn', 'epsilon_test_time'))
 
 		# init some parameters
 		self.epsilon = self.epsilon_init
@@ -30,12 +32,12 @@ class DRQN:
 		self.agt = agt
 
 		if self.agt.nn.is_rnn:
-			self.tracelength = int(self.cfg_parser.get('root', 'rnn_train_tracelength'))
+			self.tracelength = int(self.cfg_parser.get('nn', 'rnn_train_tracelength'))
 		else:
 			self.tracelength = 1
 
 		# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
-		self.n_trajs_max = int(self.cfg_parser.get('root', 'replay_memory_size'))
+		self.n_trajs_max = int(self.cfg_parser.get('dqn', 'replay_memory_size'))
 		self.replay_memory = ReplayMemory(n_trajs_max=self.n_trajs_max, minibatch_size=self.minibatch_size)
 
 		# Init plotting
@@ -99,7 +101,7 @@ class DRQN:
 			return minibatch, truetracelengths, r_batch, non_terminal_multiplier
 
 	def train_Q_network(self, timestep):
-		if (timestep > self.n_iter_pretrain):
+		if (timestep > self.n_pretrain_steps):
 			# Step 1: sample random minibatch of transitions from replay memory
 			minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
 
@@ -162,9 +164,9 @@ class DRQN:
 
 	def log_training_phase(self, timestep):
 		if timestep % 100 == 0:
-			if timestep <= self.n_iter_pretrain:
+			if timestep <= self.n_pretrain_steps:
 				state = 'pre-train'
-			elif timestep > self.n_iter_pretrain and timestep <= self.n_iter_pretrain + self.n_iter_explore:
+			elif timestep > self.n_pretrain_steps and timestep <= self.n_pretrain_steps + self.n_explore_steps:
 				state = 'train (e-greedy)'
 			else:
 				state = 'train (e-greedy, min epsilon reached)'
@@ -172,8 +174,8 @@ class DRQN:
 
 	def dec_epsilon(self, timestep):
 		# Linearly decrease epsilon
-		if self.epsilon > self.epsilon_final and timestep > self.n_iter_pretrain:
-			self.epsilon -= (self.epsilon_init - self.epsilon_final)/self.n_iter_explore
+		if self.epsilon > self.epsilon_final and timestep > self.n_pretrain_steps:
+			self.epsilon -= (self.epsilon_init - self.epsilon_final)/self.n_explore_steps
 
 	def get_qvalue(self, agt, input_obs):
 		feed_dict= {agt.nn.stateInput:[input_obs],
@@ -203,7 +205,7 @@ class DRQN:
 		action_index = 0
 
 		# Select e-greedy action (also during pre-training phase)
-		if (not test_mode and random.random() <= epsilon_to_use) or (not test_mode and timestep < self.n_iter_pretrain) or (test_mode and random.random() <= self.eps_test_time):
+		if (not test_mode and random.random() <= epsilon_to_use) or (not test_mode and timestep < self.n_pretrain_steps) or (test_mode and random.random() <= self.epsilon_test_time):
 			action_index = random.randrange(agt.n_actions)
 			action_onehot[action_index] = 1
 		# Select optimal action

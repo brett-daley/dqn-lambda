@@ -1,5 +1,6 @@
 import sys
 sys.path.append('games/')
+sys.path.append('nn_archs/')
 sys.path.append('utils/')
 import time
 import tensorflow as tf
