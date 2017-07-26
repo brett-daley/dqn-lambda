@@ -6,13 +6,6 @@ import os
 from LineplotDynamic import LineplotDynamic
 from utils_general import ReplayMemory
 
-# Hyperparameters:
-GAMMA = 0.95 # decay rate of past observations
-EPSILON_INIT = 1.0 # Starting value of epsilon (for exploration)
-EPSILON_FINAL = 0.1 # Final value of epsilon (for exploration)
-TARGET_Q_UPDATE_FREQ = 1000
-EPS_TEST_TIME = 0.01
-
 
 class DRQN:
 	def __init__(self, cfg_parser, n_actions, sess, agt):
@@ -24,8 +17,14 @@ class DRQN:
 		self.double_q_learning = self.cfg_parser.getboolean('root', 'double_q_learning')
 		self.minibatch_size = int(self.cfg_parser.get('root', 'minibatch_size')) # Size of replay memory transition minibatch in each training phase
 
+		self.discount = float(self.cfg_parser.get('root', 'discount'))
+		self.epsilon_init = float(self.cfg_parser.get('root', 'epsilon_init'))
+		self.epsilon_final = float(self.cfg_parser.get('root', 'epsilon_final'))
+		self.target_q_update_period = int(self.cfg_parser.get('root', 'target_q_update_period'))
+		self.eps_test_time = float(self.cfg_parser.get('root', 'eps_test_time'))
+
 		# init some parameters
-		self.epsilon = EPSILON_INIT
+		self.epsilon = self.epsilon_init
 		self.n_actions = n_actions
 
 		self.agt = agt
@@ -134,11 +133,11 @@ class DRQN:
 				predict_nn_actions = self.sess.run(agt.nn.predict, feed_dict=feed_dict)
 
 				doubleQ = Q2[range(self.minibatch_size * self.tracelength), predict_nn_actions]
-				y_batch = r_batch + (GAMMA*doubleQ * non_terminal_multiplier)
+				y_batch = r_batch + (self.discount * doubleQ * non_terminal_multiplier)
 
 			else:
 				QmaxT = agt.nnT.Qmax.eval(feed_dict=feed_dict)
-				y_batch = r_batch + (GAMMA * QmaxT * non_terminal_multiplier)
+				y_batch = r_batch + (self.discount * QmaxT * non_terminal_multiplier)
 
 			# Train
 			feed_dict = {agt.nn.yInput: y_batch,
@@ -154,7 +153,7 @@ class DRQN:
 			agt.nn.trainStep.run(feed_dict=feed_dict)
 
 			# Delay in a target network update - to improve learning stability
-			if timestep % TARGET_Q_UPDATE_FREQ == 0:
+			if timestep % self.target_q_update_period == 0:
 				assert agt.nnT != None
 				agt.nnT.run_copy()
 
@@ -172,8 +171,8 @@ class DRQN:
 
 	def dec_epsilon(self, timestep):
 		# Linearly decrease epsilon
-		if self.epsilon > EPSILON_FINAL and timestep > self.n_iter_pretrain:
-			self.epsilon -= (EPSILON_INIT - EPSILON_FINAL)/self.n_iter_explore
+		if self.epsilon > self.epsilon_final and timestep > self.n_iter_pretrain:
+			self.epsilon -= (self.epsilon_init - self.epsilon_final)/self.n_iter_explore
 
 	def get_qvalue(self, agt, input_obs):
 		feed_dict= {agt.nn.stateInput:[input_obs],
@@ -203,7 +202,7 @@ class DRQN:
 		action_index = 0
 
 		# Select e-greedy action (also during pre-training phase)
-		if (not test_mode and random.random() <= epsilon_to_use) or (not test_mode and timestep < self.n_iter_pretrain) or (test_mode and random.random() <= EPS_TEST_TIME):
+		if (not test_mode and random.random() <= epsilon_to_use) or (not test_mode and timestep < self.n_iter_pretrain) or (test_mode and random.random() <= self.eps_test_time):
 			action_index = random.randrange(agt.n_actions)
 			action_onehot[action_index] = 1
 		# Select optimal action

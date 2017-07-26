@@ -12,8 +12,7 @@ class Atari:
 		self.n_actions = self.env.action_space.n
 		self.obs = self.env.reset()
 
-		# TODO 2017 make this a parameter/handled automatically in the game
-		self.gamma = 0.95
+		self.discount_factor = float(self.cfg_parser.get('root', 'discount'))
 
 		# Init agents/evader
 		self.init_agt(sess=sess)
@@ -74,7 +73,7 @@ class Atari:
 
 		# Accrue value
 		self.value += self.discount*r
-		self.discount *= self.gamma
+		self.discount *= self.discount_factor
 		value_so_far = self.value # Must be here due to resetting logic below
 		next_joint_o_latest = self.next_joint_o # Must be here due to resetting logic below
 
