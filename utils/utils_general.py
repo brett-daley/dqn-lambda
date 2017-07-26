@@ -6,6 +6,7 @@ import random
 from ff_simple_2layer import ff_simple_2layer
 from ff_simple_3layer import ff_simple_3layer
 from rnn_simple_2layer import rnn_simple_2layer
+from conv_3layer import conv_3layer
 
 
 # Helper function for defining a unified NN architecture, to allow use in both AgentGround and externally
@@ -23,6 +24,12 @@ def create_specific_nn(cfg_parser, sess, scope, var_reuse, dim_state_input, n_ac
 	# 2 ff + 1 rnn + 1 ff
 	if nn_name == 'rnn_simple_2layer':
 		return rnn_simple_2layer(cfg_parser=cfg_parser, sess=sess, scope=scope, var_reuse=var_reuse, dim_state_input=dim_state_input, n_actions=n_actions, is_target_net=is_target_net, src_network=src_network)
+
+	# 3 conv + (1 rnn or 1 ff) + 1 ff
+	if nn_name == 'conv_3layer':
+		return conv_3layer(cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_target_net=is_target_net, src_network=src_network)
+
+	raise ValueError('Unhandled NN type:', nn_name)
 
 class TfSaver:
 	def __init__(self, sess, data_dir, vars_to_restore, try_to_restore=True):
