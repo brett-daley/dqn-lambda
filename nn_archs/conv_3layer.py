@@ -7,7 +7,7 @@ import tensorflow.contrib.layers as layers
 class conv_3layer(Network):
 	def __init__(self, cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_rnn=False, is_target_net=False, src_network=None):
 		super(self.__class__, self).__init__(cfg_parser, sess, scope, trainable=(not is_target_net))
-		self.is_rnn = cfg_parser.getboolean('root', 'is_recurrent')
+		self.is_rnn = cfg_parser.getboolean('root', 'make_recurrent')
 		self.dim_state_input = dim_state_input
 		self.n_actions = n_actions
 		self.var_reuse = var_reuse
