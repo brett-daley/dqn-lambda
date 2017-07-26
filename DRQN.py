@@ -35,7 +35,8 @@ class DRQN:
 			self.tracelength = 1
 
 		# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
-		self.replay_memory = ReplayMemory(n_trajs_max=200, minibatch_size=self.minibatch_size)
+		self.n_trajs_max = int(self.cfg_parser.get('root', 'replay_memory_size'))
+		self.replay_memory = ReplayMemory(n_trajs_max=self.n_trajs_max, minibatch_size=self.minibatch_size)
 
 		# Init plotting
 		self.plot_qvalue_dqn = LineplotDynamic('Training Epoch', 'Q', '')
