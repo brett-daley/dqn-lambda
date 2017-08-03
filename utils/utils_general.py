@@ -67,7 +67,7 @@ class ReplayMemory:
 		if len(self.traj_mem) + 1 >= self.n_trajs_max:
 			# Deletes the first trajectory
 			self.traj_mem[0:(1+len(self.traj_mem))-self.n_trajs_max] = []
-		# Appends new multiagent trajectory, consisting of (o_joint, a_joint, r, o_joint', terminal)
+		# Appends new multiagent trajectory, consisting of (o, a, r, o', terminal)
 		self.traj_mem.append(sarsa_traj)
 
 		# Initialize the padding element based on first added sarsa_traj, for future use
@@ -75,7 +75,7 @@ class ReplayMemory:
 			self.calc_traj_pad_elem()
 			self.is_traj_pad_elem_calculated = True
 
-	# Compute a blank/zero-filled multiagent trajectory point (o_joint, a_joint, r, o_joint', terminal)
+	# Compute a blank/zero-filled multiagent trajectory point (o, a, r, o', terminal)
 	# used for zero-padding data when training RNN traces of varying length
 	def calc_traj_pad_elem(self):
 		# Use first point in first trajectory as a reference
@@ -87,9 +87,8 @@ class ReplayMemory:
 		for i_agt in xrange(0,len(self.padding_elem[0][0])):
 			self.padding_elem[0][0][i_agt] = self.padding_elem[0][0][i_agt]*0.
 
-		# Set all cur_action for all agents to 0 vector
-		for i_agt in xrange(0,len(self.padding_elem[0][1])):
-			self.padding_elem[0][1][i_agt] = self.padding_elem[0][1][i_agt]*0.
+		# Set action to 0
+		self.padding_elem[0][1] = 0
 
 		# Set reward to 0
 		self.padding_elem[0][2] = 0

@@ -194,23 +194,15 @@ class DRQN:
 		return QValue[0]
 
 	def get_action(self, agt, timestep, input_obs, test_mode=False, epsilon=None):
-		if epsilon:
-			epsilon_to_use = epsilon
-		else:
-			epsilon_to_use = self.epsilon
+		epsilon_to_use = epsilon if epsilon else self.epsilon
 
 		QValue = self.get_qvalue(agt=agt, input_obs=input_obs)
 
-		action_onehot = np.zeros(agt.n_actions)
-		action_index = 0
-
 		# Select e-greedy action (also during pre-training phase)
 		if (not test_mode and random.random() <= epsilon_to_use) or (not test_mode and timestep < self.n_pretrain_steps) or (test_mode and random.random() <= self.epsilon_test_time):
-			action_index = random.randrange(agt.n_actions)
-			action_onehot[action_index] = 1
+			action = random.randrange(agt.n_actions)
 		# Select optimal action
 		else:
-			action_index = np.argmax(QValue)
-			action_onehot[action_index] = 1
+			action = np.argmax(QValue)
 
-		return action_onehot, QValue
+		return action, QValue

@@ -38,16 +38,16 @@ def train(cfg_parser, data_dir):
 
 	# Skip training if tf_saver loaded pre-trained model
 	if not tf_saver.pre_trained:
-		q_value_traj, joint_value_traj, init_q_value_traj = dqn_mgr.train_dqn(game)
+		q_value_traj, value_traj, init_q_value_traj = dqn_mgr.train_dqn(game)
 		q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_qvalue.txt'))
 		init_q_value_traj[0].saveData(data_dir=os.path.join(data_dir, 'teacher_init_qvalue.txt'))
-		joint_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_jointvalue.txt'))
+		value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_value.txt'))
 
 		tf_saver.save_sess(timestep=1, save_freq=1)
 	else:
 		m_plotter = Plotter(label_x='iter', label_y='Actual Value Received', title='', adjust_right=0.73)
 		m_plotter.update_palette(n_colors=1)
-		m_plotter.add_data_to_plot(data_dir=data_dir, data_file='teacher_jointvalue.txt', label='Task')
+		m_plotter.add_data_to_plot(data_dir=data_dir, data_file='teacher_value.txt', label='Task')
 		m_plotter.update_legend()
 		plt.show()
 
