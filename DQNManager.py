@@ -84,7 +84,6 @@ class DQNManager:
 		# Initial states and actions taken -- for plotting predicted value against actual
 		n_episodes = 50
 		s_batch_initial = np.zeros([n_episodes] + list(self.dqn.agt.dim_obs))
-		a_batch_initial = np.zeros((n_episodes, self.dqn.agt.n_actions))
 
 		for i_episode in xrange(n_episodes):
 			# Reset the game just in case anyone else was handling the game prior or forgot to reset RNN state. It should not hurt.
@@ -96,7 +95,6 @@ class DQNManager:
 				obs, action, _, _, terminal, value_so_far = self.update_game(game=game, is_test_mode=True)
 				if not collected_initial_conds:
 					s_batch_initial[i_episode,:] = obs
-					a_batch_initial[i_episode,:] = action
 					collected_initial_conds = True
 
 			# Append the value obtained. Re-initialization must occur on top of loop to ensure correct setting of dqn.
@@ -105,7 +103,7 @@ class DQNManager:
 		values_mean = np.mean(values_all)
 		values_stdev = np.std(values_all)
 
-		x, init_q_mean, init_q_stdev = self.dqn.update_Q_plot(timestep=i_train_steps, s_batch_prespecified=s_batch_initial, a_batch_prespecified=a_batch_initial)
+		x, init_q_mean, init_q_stdev = self.dqn.update_Q_plot(timestep=i_train_steps, s_batch_prespecified=s_batch_initial)
 		self.dqn.plot_value_dqn.update(hl_name='Game', label='Task', x_new=i_train_steps, y_new=values_mean, y_stdev_new=values_stdev, init_at_origin=False)
 
 		return values_mean, values_stdev, init_q_mean, init_q_stdev

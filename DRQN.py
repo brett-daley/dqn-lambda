@@ -51,19 +51,16 @@ class DRQN:
 	def init_agts_nnTs(self):
 		self.agt.init_nnT()
 
-	def update_Q_plot(self, timestep, hl_name=None, label=None, s_batch_prespecified=None, a_batch_prespecified=None):
+	def update_Q_plot(self, timestep, hl_name='q_plot', label=None, s_batch_prespecified=None):
 		agt = self.agt
 
 		if s_batch_prespecified is None:
 			# Since tracelength of 1 used, this ensures that truetracelengths = [1,....,1] and no masking required below
 			_, minibatch = self.replay_memory.sample_trace(tracelength=1)
-			s_batch = np.vstack([row for row in minibatch[:,0]])
-			a_batch = np.vstack([row for row in minibatch[:,1]])
+			s_batch = np.array([sample[0] for sample in minibatch])
 			minibatch_size_plot = self.minibatch_size
 		else:
 			s_batch = s_batch_prespecified
-			# a_batch = a_batch_prespecified
-			# QValue = self.get_qvalue(agt = agt, input_obs = input_obs)
 			minibatch_size_plot = len(s_batch_prespecified)
 
 		x = timestep
@@ -75,16 +72,10 @@ class DRQN:
 		y_mean = np.mean(y)
 		y_stdev = np.std(y)
 
-		if not hl_name or not label:
-			if s_batch_prespecified is None:
-				self.plot_qvalue_dqn.update(hl_name='q_plot', x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
-			else:
-				self.plot_init_qvalue_dqn.update(hl_name='q_plot', x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
+		if s_batch_prespecified is None:
+			self.plot_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
 		else:
-			if s_batch_prespecified is None:
-				self.plot_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
-			else:
-				self.plot_init_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
+			self.plot_init_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
 
 		return x, y_mean, y_stdev
 
@@ -106,9 +97,9 @@ class DRQN:
 			minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
 
 			agt = self.agt
-			s_batch = np.vstack([row for row in minibatch[:,0]])
-			a_batch = np.vstack([row for row in minibatch[:,1]])
-			s_next_batch = np.vstack([row for row in minibatch[:,3]])
+			s_batch = np.array([sample[0] for sample in minibatch])
+			a_batch = np.array([sample[1] for sample in minibatch])
+			s_next_batch = np.array([sample[3] for sample in minibatch])
 
 			# Calculate DRQN target
 			feed_dict = {agt.nnT.stateInput: s_next_batch,
@@ -117,7 +108,7 @@ class DRQN:
 						 agt.nnT.batch_size: self.minibatch_size}
 
 			if agt.nnT.is_rnn:
-				rnn_state_train = (np.zeros([self.minibatch_size,agt.nn.h_size]), np.zeros([self.minibatch_size,agt.nn.h_size]))
+				rnn_state_train = (np.zeros([self.minibatch_size, agt.nn.h_size]), np.zeros([self.minibatch_size, agt.nn.h_size]))
 				feed_dict[agt.nnT.rnn_state_in] = rnn_state_train
 
 			if self.double_q_learning:

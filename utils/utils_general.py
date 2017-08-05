@@ -102,7 +102,7 @@ class ReplayMemory:
 
 	# Samples an extended trace from a traj
 	def sample_trace(self, tracelength):
-		sampled_trajs = random.sample(self.traj_mem,self.minibatch_size)
+		sampled_trajs = random.sample(self.traj_mem, self.minibatch_size)
 		sampled_points = []
 		truetracelengths = []
 
@@ -128,9 +128,9 @@ class ReplayMemory:
 			sampled_points.extend([self.padding_elem]*num_extra_pts)
 			truetracelengths.extend([i_end-i_start])
 
-		sampled_points = np.array(sampled_points)
+		minibatch = np.reshape(sampled_points, [self.minibatch_size*tracelength, self.mem_tuple_size])
 
-		return truetracelengths, np.reshape(sampled_points,[self.minibatch_size*tracelength,self.mem_tuple_size])
+		return truetracelengths, minibatch
 
 class Data2DTraj:
 	def __init__(self):

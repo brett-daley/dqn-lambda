@@ -26,11 +26,12 @@ class rnn_simple_2layer(Network):
 			self.create_training_method()
 
 	def create_training_method(self):
-		self.actionInput = tf.placeholder('float', shape=[None,self.n_actions])
-		self.yInput = tf.placeholder('float', shape=[None]) # Q-learning target (defined in DQN paper)
+		self.actionInput = tf.placeholder(tf.int32, shape=[None])
+		self.yInput = tf.placeholder(tf.float32, shape=[None]) # Q-learning target (defined in DQN paper)
 
-		# Per DQN paper training algorithm, update SGD using ONLY the Q-Value for the specified replay memory action (basically zeros out all the other Q values due to 1-hot-coded action and element-wise tf.mul)
-		self.Q_Action = tf.reduce_sum(tf.multiply(self.QValue, self.actionInput), axis=1)
+		# Per DQN paper training algorithm, update SGD using ONLY the Q-Values for the specified replay memory actions (i.e. action[0] indexes into QValue[0], action[1] indexes into QValue[1], etc)
+		indices = tf.stack([tf.range(tf.size(self.actionInput)), self.actionInput], axis=1)
+		self.Q_Action = tf.gather_nd(self.QValue, indices)
 
 		# Mask out zero-paddings for varying length RNN sequences
 		lower_triangular_ones = tf.constant(np.tril(np.ones([32, 32])), dtype=tf.float32) # 32 is the maximum tracelength. Temp hack since numpy needs an int, so self.tracelength doesn't work here since tf type.
@@ -49,8 +50,8 @@ class rnn_simple_2layer(Network):
 		with tf.variable_scope(self.scope, reuse=self.var_reuse):
 			# INPUT stateInput, I think each batch is technically batchsize*tracelength, so the input is a vstacked [batchsize*tracelength, input_dim] in dimension
 			self.stateInput = tf.placeholder(tf.float32, [None] + list(self.dim_state_input), name='stateInput')
-			self.tracelength = tf.placeholder(dtype=tf.int32, name='tracelength')
-			self.batch_size = tf.placeholder(dtype=tf.int32, name='batch_size')
+			self.tracelength = tf.placeholder(tf.int32, name='tracelength')
+			self.batch_size = tf.placeholder(tf.int32, name='batch_size')
 			self.truetracelengths = tf.placeholder(tf.int32, [None], name='truetracelengths') # traces are varying length, this [batch_size] vector specifies the true length for each trace in the batch
 
 			weights_initializer = tf.contrib.layers.xavier_initializer()
