@@ -30,11 +30,7 @@ class DRQN:
 		self.n_actions = n_actions
 
 		self.agt = agt
-
-		if self.agt.nn.is_rnn:
-			self.tracelength = int(self.cfg_parser.get('nn', 'rnn_train_tracelength'))
-		else:
-			self.tracelength = 1
+		self.tracelength = int(self.cfg_parser.get('nn', 'agent_history_length')) if self.agt.nn.is_rnn else 1
 
 		# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
 		self.n_trajs_max = int(self.cfg_parser.get('dqn', 'replay_memory_size'))
@@ -80,26 +76,22 @@ class DRQN:
 		return x, y_mean, y_stdev
 
 	def get_processed_minibatch(self):
-			if self.agt.nn.is_rnn:
-				truetracelengths, minibatch = self.replay_memory.sample_trace(tracelength=self.tracelength)
-			else:
-				truetracelengths, minibatch = self.replay_memory.sample_trace(tracelength=1)
+		truetracelengths, minibatch = self.replay_memory.sample_trace(self.tracelength)
 
-			# Rewards and termination signals are shared by all agents, so only process once
-			r_batch = minibatch[:,2]
-			non_terminal_multiplier = -(minibatch[:,4] - 1)
+		s_batch = np.array([sample[0] for sample in minibatch])
+		a_batch = minibatch[:,1]
+		r_batch = minibatch[:,2]
+		s_next_batch = np.array([sample[3] for sample in minibatch])
+		non_terminal_multiplier = 1 - minibatch[:,4]
 
-			return minibatch, truetracelengths, r_batch, non_terminal_multiplier
+		return s_batch, a_batch, r_batch, s_next_batch, non_terminal_multiplier, truetracelengths
 
 	def train_Q_network(self, timestep):
 		if (timestep > self.n_pretrain_steps):
 			# Step 1: sample random minibatch of transitions from replay memory
-			minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
+			s_batch, a_batch, r_batch, s_next_batch, non_terminal_multiplier, truetracelengths = self.get_processed_minibatch()
 
 			agt = self.agt
-			s_batch = np.array([sample[0] for sample in minibatch])
-			a_batch = np.array([sample[1] for sample in minibatch])
-			s_next_batch = np.array([sample[3] for sample in minibatch])
 
 			# Calculate DRQN target
 			feed_dict = {agt.nnT.stateInput: s_next_batch,
@@ -187,7 +179,7 @@ class DRQN:
 	def get_action(self, agt, timestep, input_obs, test_mode=False, epsilon=None):
 		epsilon_to_use = epsilon if epsilon else self.epsilon
 
-		QValue = self.get_qvalue(agt=agt, input_obs=input_obs)
+		QValue = self.get_qvalue(agt, input_obs)
 
 		# Select e-greedy action (also during pre-training phase)
 		if (not test_mode and random.random() <= epsilon_to_use) or (not test_mode and timestep < self.n_pretrain_steps) or (test_mode and random.random() <= self.epsilon_test_time):

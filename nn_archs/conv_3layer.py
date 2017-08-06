@@ -81,8 +81,8 @@ class conv_3layer(Network):
 				self.rnn_output = tf.reshape(self.rnn_output, shape=[-1, self.h_size])
 				net = self.rnn_output
 			else:
-				# Reshape to [batch_size*tracelength, n_features] for the FC layer
-				net = tf.reshape(net, [self.batch_size*self.tracelength, n_features])
+				# Reshape to [batch_size, n_features] for the FC layer
+				net = tf.reshape(net, [self.batch_size, n_features])
 				net = layers.fully_connected(net, num_outputs=self.h_size, activation_fn=tf.nn.relu)
 
 			# Final linear FC layer to map everything to real value scores

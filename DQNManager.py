@@ -18,10 +18,8 @@ class DQNManager:
 		self.sess.run(tf.global_variables_initializer())
 
 	def update_game(self, game, timestep=9999999, is_test_mode=False, epsilon_forced=None):
-		epsilon = epsilon_forced if epsilon_forced else None
-
 		obs = game.get_obs()
-		action, qvalues = self.dqn.get_action(epsilon=epsilon, agt=game.agt, timestep=timestep, input_obs=obs, test_mode=is_test_mode)
+		action, qvalues = self.dqn.get_action(epsilon=epsilon_forced, agt=game.agt, timestep=timestep, input_obs=obs, test_mode=is_test_mode)
 		next_obs, reward, terminal, value_so_far = game.next(action=action)
 
 		return obs, action, reward, next_obs, terminal, value_so_far
