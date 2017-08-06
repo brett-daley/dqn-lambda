@@ -10,6 +10,9 @@ class DQNManager:
 		self.cfg_parser = cfg_parser
 		self.sess = sess
 
+		self.benchmark_every_n_episodes = int(self.cfg_parser.get('env', 'benchmark_every_n_episodes'))
+		self.benchmark_for_n_episodes = int(self.cfg_parser.get('env', 'benchmark_for_n_episodes'))
+
 		self.dqn = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, agt=game.agt)
 
 		# Create a list of trainable teacher task variables, so TfSaver can later save and restore them
@@ -25,9 +28,7 @@ class DQNManager:
 		return obs, action, reward, next_obs, terminal, value_so_far
 
 	def train_dqn(self, game):
-		train_freq = 5
-		i_train_steps = 0
-		i_training_epoch = 0
+		train_freq = int(self.cfg_parser.get('nn', 'train_freq'))
 		n_train_steps = int(self.cfg_parser.get('env', 'n_train_steps'))
 		minibatch_size = int(self.cfg_parser.get('dqn', 'minibatch_size'))
 
@@ -37,30 +38,35 @@ class DQNManager:
 
 		game.init_agt_nnT()
 
+		i_training_epoch = 0
 		n_games_complete = 0
 
-		while i_train_steps < n_train_steps:
+		for i_train_step in xrange(n_train_steps):
+			# Benchmark performance
+			if n_games_complete % self.benchmark_every_n_episodes == 0:
+				value_mean, value_stdev, init_q_mean, init_q_stdev = self.benchmark_perf(game=game, i_train_step=i_training_epoch)
+				value_traj.appendToTraj(i_training_epoch, value_mean, value_stdev)
+				init_q_value_traj.appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
+
 			# Game episode completed, so reset
 			terminal = False
 			sarsa_traj = []
 
 			while not terminal:
 				# Execute game and collect a single-timestep experience
-				obs, action, reward, next_obs, terminal, _ = self.update_game(game=game, timestep=i_train_steps)
+				obs, action, reward, next_obs, terminal, _ = self.update_game(game=game, timestep=i_train_step)
 				sarsa_traj.append(np.reshape(np.array([obs, action, reward, next_obs, terminal]), [1,5]))
 
 				# Decrease e-greedy epsilon
-				self.dqn.dec_epsilon(timestep=i_train_steps)
+				self.dqn.dec_epsilon(timestep=i_train_step)
 
 				# Train (at train_freq)
-				if n_games_complete > minibatch_size and i_train_steps % train_freq == 0:
-					self.dqn.train_Q_network(timestep=i_train_steps)
+				if n_games_complete > minibatch_size and i_train_step % train_freq == 0:
+					self.dqn.train_Q_network(timestep=i_train_step)
 					i_training_epoch += 1
 
-				i_train_steps += 1
-
 				# Plot q value convergence
-				if n_games_complete > minibatch_size and i_train_steps % 1000 == 0:
+				if n_games_complete > minibatch_size and i_train_step % 1000 == 0:
 					x, y_mean, y_stdev = self.dqn.update_Q_plot(timestep=i_training_epoch)
 					q_value_traj.appendToTraj(x, y_mean, y_stdev)
 
@@ -68,22 +74,16 @@ class DQNManager:
 			n_games_complete += 1
 			self.dqn.replay_memory.add(sarsa_traj)
 
-			if n_games_complete == 1 or n_games_complete % 50 == 0:
-				value_mean, value_stdev, init_q_mean, init_q_stdev = self.benchmark_perf(game=game, i_train_steps=i_training_epoch)
-				value_traj.appendToTraj(i_training_epoch, value_mean, value_stdev)
-				init_q_value_traj.appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
-
 		return q_value_traj, value_traj, init_q_value_traj
 
-	def benchmark_perf(self, game, i_train_steps):
+	def benchmark_perf(self, game, i_train_step):
 		print '----- Benchmarking performance -----'
 		values_all = np.array([])
 
 		# Initial states and actions taken -- for plotting predicted value against actual
-		n_episodes = 50
-		s_batch_initial = np.zeros([n_episodes] + list(self.dqn.agt.dim_obs))
+		s_batch_initial = np.zeros([self.benchmark_for_n_episodes] + list(self.dqn.agt.dim_obs))
 
-		for i_episode in xrange(n_episodes):
+		for i_episode in xrange(self.benchmark_for_n_episodes):
 			# Reset the game just in case anyone else was handling the game prior or forgot to reset RNN state. It should not hurt.
 			game.reset_game()
 			terminal = False
@@ -101,7 +101,7 @@ class DQNManager:
 		values_mean = np.mean(values_all)
 		values_stdev = np.std(values_all)
 
-		x, init_q_mean, init_q_stdev = self.dqn.update_Q_plot(timestep=i_train_steps, s_batch_prespecified=s_batch_initial)
-		self.dqn.plot_value_dqn.update(hl_name='Game', label='Task', x_new=i_train_steps, y_new=values_mean, y_stdev_new=values_stdev, init_at_origin=False)
+		x, init_q_mean, init_q_stdev = self.dqn.update_Q_plot(timestep=i_train_step, s_batch_prespecified=s_batch_initial)
+		self.dqn.plot_value_dqn.update(hl_name='Game', label='Task', x_new=i_train_step, y_new=values_mean, y_stdev_new=values_stdev, init_at_origin=False)
 
 		return values_mean, values_stdev, init_q_mean, init_q_stdev

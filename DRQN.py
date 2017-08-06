@@ -22,7 +22,7 @@ class DRQN:
 		self.discount = float(self.cfg_parser.get('dqn', 'discount'))
 		self.epsilon_init = float(self.cfg_parser.get('dqn', 'epsilon_init'))
 		self.epsilon_final = float(self.cfg_parser.get('dqn', 'epsilon_final'))
-		self.target_q_update_period = int(self.cfg_parser.get('dqn', 'target_q_update_period'))
+		self.target_q_update_freq = int(self.cfg_parser.get('dqn', 'target_q_update_freq'))
 		self.epsilon_test_time = float(self.cfg_parser.get('dqn', 'epsilon_test_time'))
 
 		# init some parameters
@@ -139,7 +139,7 @@ class DRQN:
 			agt.nn.trainStep.run(feed_dict=feed_dict)
 
 			# Delay in a target network update - to improve learning stability
-			if timestep % self.target_q_update_period == 0:
+			if timestep % self.target_q_update_freq == 0:
 				assert agt.nnT != None
 				agt.nnT.run_copy()
 
