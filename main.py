@@ -1,10 +1,11 @@
 import sys
 sys.path.append('games/')
+sys.path.append('nn_archs/')
 sys.path.append('utils/')
 import time
 import tensorflow as tf
 from DQNManager import DQNManager
-from GameManager import GameManager
+from Atari import Atari
 import os
 from ConfigParser import SafeConfigParser
 from utils_general import TfSaver
@@ -29,24 +30,24 @@ def train(cfg_parser, data_dir):
 	sess = tf.InteractiveSession()
 
 	# Init game and DQN
-	game_mgr = GameManager(cfg_parser=cfg_parser, sess=sess)
-	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_actions=game_mgr.n_actions, game_mgr=game_mgr, sess=sess)
+	game = Atari(cfg_parser=cfg_parser, sess=sess)
+	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_actions=game.n_actions, game=game, sess=sess)
 
 	# Automatically loads checkpoint if data_dir contains it. Otherwise, starts fresh.
 	tf_saver = TfSaver(sess=sess, data_dir=data_dir, vars_to_restore=dqn_mgr.teacher_vars)
 
 	# Skip training if tf_saver loaded pre-trained model
 	if not tf_saver.pre_trained:
-		q_value_traj, joint_value_traj, init_q_value_traj = dqn_mgr.train_dqn(game=game_mgr.game)
+		q_value_traj, value_traj, init_q_value_traj = dqn_mgr.train_dqn(game)
 		q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_qvalue.txt'))
-		init_q_value_traj[0].saveData(data_dir=os.path.join(data_dir, 'teacher_init_qvalue.txt'))
-		joint_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_jointvalue.txt'))
+		init_q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_init_qvalue.txt'))
+		value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_value.txt'))
 
 		tf_saver.save_sess(timestep=1, save_freq=1)
 	else:
 		m_plotter = Plotter(label_x='iter', label_y='Actual Value Received', title='', adjust_right=0.73)
 		m_plotter.update_palette(n_colors=1)
-		m_plotter.add_data_to_plot(data_dir=data_dir, data_file='teacher_jointvalue.txt', label='Task')
+		m_plotter.add_data_to_plot(data_dir=data_dir, data_file='teacher_value.txt', label='Task')
 		m_plotter.update_legend()
 		plt.show()
 
@@ -56,7 +57,7 @@ def main():
 
 	# data_dir is empty, so train for new game
 	if not data_dir:
-		cfg_ini = 'config_TargetPursuit_2.ini'
+		cfg_ini = 'config_Atari.ini'
 
 		# Read the config file and create a data directory for it
 		cfg_parser = get_cfg_parser(os.path.join('./games/', cfg_ini))

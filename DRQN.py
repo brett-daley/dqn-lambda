@@ -1,17 +1,9 @@
 import sys
-sys.path.append('nn_archs/')
 import numpy as np
 import random
 import os
 from LineplotDynamic import LineplotDynamic
 from utils_general import ReplayMemory
-
-# Hyperparameters:
-GAMMA = 0.95 # decay rate of past observations
-EPSILON_INIT = 1.0 # Starting value of epsilon (for exploration)
-EPSILON_FINAL = 0.1 # Final value of epsilon (for exploration)
-TARGET_Q_UPDATE_FREQ = 1000
-EPS_TEST_TIME = 0.01
 
 
 class DRQN:
@@ -19,24 +11,30 @@ class DRQN:
 		self.cfg_parser = cfg_parser
 		self.sess = sess
 
-		self.n_iter_pretrain = int(self.cfg_parser.get('root', 'n_iter_pretrain')) # Initial phase where no training occurs. Allows population of replay memory before training.
-		self.n_iter_explore = int(self.cfg_parser.get('root', 'n_iter_explore')) # Random policy exploration phase - frames over which to anneal epsilon
-		self.double_q_learning = self.cfg_parser.getboolean('root', 'double_q_learning')
-		self.minibatch_size = int(self.cfg_parser.get('root', 'minibatch_size')) # Size of replay memory transition minibatch in each training phase
+		# Initial phase where no training occurs. Allows population of replay memory before training.
+		self.n_pretrain_steps = int(self.cfg_parser.get('env', 'n_pretrain_steps'))
+		# Random policy exploration phase - frames over which to anneal epsilon
+		self.n_explore_steps = int(self.cfg_parser.get('env', 'n_explore_steps'))
+		self.double_q_learning = self.cfg_parser.getboolean('dqn', 'double_q_learning')
+		# Size of replay memory transition minibatch in each training phase
+		self.minibatch_size = int(self.cfg_parser.get('dqn', 'minibatch_size'))
+
+		self.discount = float(self.cfg_parser.get('dqn', 'discount'))
+		self.epsilon_init = float(self.cfg_parser.get('dqn', 'epsilon_init'))
+		self.epsilon_final = float(self.cfg_parser.get('dqn', 'epsilon_final'))
+		self.target_q_update_freq = int(self.cfg_parser.get('dqn', 'target_q_update_freq'))
+		self.epsilon_test_time = float(self.cfg_parser.get('dqn', 'epsilon_test_time'))
 
 		# init some parameters
-		self.epsilon = EPSILON_INIT
+		self.epsilon = self.epsilon_init
 		self.n_actions = n_actions
 
 		self.agt = agt
-
-		if self.agt.nn.is_rnn:
-			self.tracelength = int(self.cfg_parser.get('root', 'rnn_train_tracelength'))
-		else:
-			self.tracelength = 1
+		self.tracelength = int(self.cfg_parser.get('nn', 'agent_history_length')) if self.agt.nn.is_rnn else 1
 
 		# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
-		self.replay_memory = ReplayMemory(n_trajs_max=200, minibatch_size=self.minibatch_size)
+		self.n_trajs_max = int(self.cfg_parser.get('dqn', 'replay_memory_size'))
+		self.replay_memory = ReplayMemory(n_trajs_max=self.n_trajs_max, minibatch_size=self.minibatch_size)
 
 		# Init plotting
 		self.plot_qvalue_dqn = LineplotDynamic('Training Epoch', 'Q', '')
@@ -49,19 +47,16 @@ class DRQN:
 	def init_agts_nnTs(self):
 		self.agt.init_nnT()
 
-	def update_Q_plot(self, timestep, hl_name=None, label=None, s_batch_prespecified=None, a_batch_prespecified=None):
+	def update_Q_plot(self, timestep, hl_name='q_plot', label=None, s_batch_prespecified=None):
 		agt = self.agt
 
 		if s_batch_prespecified is None:
 			# Since tracelength of 1 used, this ensures that truetracelengths = [1,....,1] and no masking required below
 			_, minibatch = self.replay_memory.sample_trace(tracelength=1)
-			s_batch = np.vstack([row[0] for row in minibatch[:,0]])
-			a_batch = np.vstack([row[0] for row in minibatch[:,1]])
+			s_batch = np.array([sample[0] for sample in minibatch])
 			minibatch_size_plot = self.minibatch_size
 		else:
 			s_batch = s_batch_prespecified
-			# a_batch = a_batch_prespecified
-			# QValue = self.get_qvalue(agt = agt, input_obs = input_obs)
 			minibatch_size_plot = len(s_batch_prespecified)
 
 		x = timestep
@@ -73,40 +68,30 @@ class DRQN:
 		y_mean = np.mean(y)
 		y_stdev = np.std(y)
 
-		if not hl_name or not label:
-			if s_batch_prespecified is None:
-				self.plot_qvalue_dqn.update(hl_name='q_plot', x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
-			else:
-				self.plot_init_qvalue_dqn.update(hl_name='q_plot', x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
+		if s_batch_prespecified is None:
+			self.plot_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
 		else:
-			if s_batch_prespecified is None:
-				self.plot_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
-			else:
-				self.plot_init_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
+			self.plot_init_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
 
 		return x, y_mean, y_stdev
 
 	def get_processed_minibatch(self):
-			if self.agt.nn.is_rnn:
-				truetracelengths, minibatch = self.replay_memory.sample_trace(tracelength=self.tracelength)
-			else:
-				truetracelengths, minibatch = self.replay_memory.sample_trace(tracelength=1)
+		truetracelengths, minibatch = self.replay_memory.sample_trace(self.tracelength)
 
-			# Rewards and termination signals are shared by all agents, so only process once
-			r_batch = minibatch[:,2]
-			non_terminal_multiplier = -(minibatch[:,4] - 1)
+		s_batch = np.array([sample[0] for sample in minibatch])
+		a_batch = minibatch[:,1]
+		r_batch = minibatch[:,2]
+		s_next_batch = np.array([sample[3] for sample in minibatch])
+		non_terminal_multiplier = 1 - minibatch[:,4]
 
-			return minibatch, truetracelengths, r_batch, non_terminal_multiplier
+		return s_batch, a_batch, r_batch, s_next_batch, non_terminal_multiplier, truetracelengths
 
 	def train_Q_network(self, timestep):
-		if (timestep > self.n_iter_pretrain):
+		if (timestep > self.n_pretrain_steps):
 			# Step 1: sample random minibatch of transitions from replay memory
-			minibatch, truetracelengths, r_batch, non_terminal_multiplier = self.get_processed_minibatch()
+			s_batch, a_batch, r_batch, s_next_batch, non_terminal_multiplier, truetracelengths = self.get_processed_minibatch()
 
 			agt = self.agt
-			s_batch = np.vstack([row[agt.i] for row in minibatch[:,0]])
-			a_batch = np.vstack([row[agt.i] for row in minibatch[:,1]])
-			s_next_batch = np.vstack([row[agt.i] for row in minibatch[:,3]])
 
 			# Calculate DRQN target
 			feed_dict = {agt.nnT.stateInput: s_next_batch,
@@ -115,7 +100,7 @@ class DRQN:
 						 agt.nnT.batch_size: self.minibatch_size}
 
 			if agt.nnT.is_rnn:
-				rnn_state_train = (np.zeros([self.minibatch_size,agt.nn.h_size]), np.zeros([self.minibatch_size,agt.nn.h_size]))
+				rnn_state_train = (np.zeros([self.minibatch_size, agt.nn.h_size]), np.zeros([self.minibatch_size, agt.nn.h_size]))
 				feed_dict[agt.nnT.rnn_state_in] = rnn_state_train
 
 			if self.double_q_learning:
@@ -134,11 +119,11 @@ class DRQN:
 				predict_nn_actions = self.sess.run(agt.nn.predict, feed_dict=feed_dict)
 
 				doubleQ = Q2[range(self.minibatch_size * self.tracelength), predict_nn_actions]
-				y_batch = r_batch + (GAMMA*doubleQ * non_terminal_multiplier)
+				y_batch = r_batch + (self.discount * doubleQ * non_terminal_multiplier)
 
 			else:
 				QmaxT = agt.nnT.Qmax.eval(feed_dict=feed_dict)
-				y_batch = r_batch + (GAMMA * QmaxT * non_terminal_multiplier)
+				y_batch = r_batch + (self.discount * QmaxT * non_terminal_multiplier)
 
 			# Train
 			feed_dict = {agt.nn.yInput: y_batch,
@@ -154,26 +139,27 @@ class DRQN:
 			agt.nn.trainStep.run(feed_dict=feed_dict)
 
 			# Delay in a target network update - to improve learning stability
-			if timestep % TARGET_Q_UPDATE_FREQ == 0:
+			if timestep % self.target_q_update_freq == 0:
 				assert agt.nnT != None
 				agt.nnT.run_copy()
 
-		self.log_training_phase(timestep)
+		if timestep % 100 == 0:
+			self.log_training_phase(timestep)
 
 	def log_training_phase(self, timestep):
-		if timestep % 100 == 0:
-			if timestep <= self.n_iter_pretrain:
-				state = 'pre-train'
-			elif timestep > self.n_iter_pretrain and timestep <= self.n_iter_pretrain + self.n_iter_explore:
-				state = 'train (e-greedy)'
-			else:
-				state = 'train (e-greedy, min epsilon reached)'
-			print 'ITER', timestep, '| PHASE', state, '| EPSILON', self.epsilon
+		if timestep <= self.n_pretrain_steps:
+			phase = 'pre-train'
+		elif timestep <= self.n_pretrain_steps + self.n_explore_steps:
+			phase = 'train (e-greedy)'
+		else:
+			phase = 'train (e-greedy, min epsilon reached)'
+
+		print 'ITER {} | PHASE {} | EPSILON {}'.format(timestep, phase, self.epsilon)
 
 	def dec_epsilon(self, timestep):
 		# Linearly decrease epsilon
-		if self.epsilon > EPSILON_FINAL and timestep > self.n_iter_pretrain:
-			self.epsilon -= (EPSILON_INIT - EPSILON_FINAL)/self.n_iter_explore
+		if self.epsilon > self.epsilon_final and timestep > self.n_pretrain_steps:
+			self.epsilon -= (self.epsilon_init - self.epsilon_final)/self.n_explore_steps
 
 	def get_qvalue(self, agt, input_obs):
 		feed_dict= {agt.nn.stateInput:[input_obs],
@@ -192,23 +178,15 @@ class DRQN:
 		return QValue[0]
 
 	def get_action(self, agt, timestep, input_obs, test_mode=False, epsilon=None):
-		if epsilon:
-			epsilon_to_use = epsilon
-		else:
-			epsilon_to_use = self.epsilon
+		epsilon_to_use = epsilon if epsilon else self.epsilon
 
-		QValue = self.get_qvalue(agt=agt, input_obs=input_obs)
-
-		action_onehot = np.zeros(agt.n_actions)
-		action_index = 0
+		QValue = self.get_qvalue(agt, input_obs)
 
 		# Select e-greedy action (also during pre-training phase)
-		if (not test_mode and random.random() <= epsilon_to_use) or (not test_mode and timestep < self.n_iter_pretrain) or (test_mode and random.random() <= EPS_TEST_TIME):
-			action_index = random.randrange(agt.n_actions)
-			action_onehot[action_index] = 1
+		if (not test_mode and random.random() <= epsilon_to_use) or (not test_mode and timestep < self.n_pretrain_steps) or (test_mode and random.random() <= self.epsilon_test_time):
+			action = random.randrange(agt.n_actions)
 		# Select optimal action
 		else:
-			action_index = np.argmax(QValue)
-			action_onehot[action_index] = 1
+			action = np.argmax(QValue)
 
-		return action_onehot, QValue
+		return action, QValue

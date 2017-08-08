@@ -3,26 +3,24 @@ import numpy as np
 import os
 import copy
 import random
-from ff_simple_2layer import ff_simple_2layer
-from ff_simple_3layer import ff_simple_3layer
 from rnn_simple_2layer import rnn_simple_2layer
+from conv_3layer import conv_3layer
 
 
 # Helper function for defining a unified NN architecture, to allow use in both AgentGround and externally
 def create_specific_nn(cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_target_net=False, src_network=None):
-	nn_name = cfg_parser.get('root', 'nn_type')
-
-	# 2 layer ff
-	if nn_name == 'ff_simple_2layer':
-		return ff_simple_2layer(sess=sess, scope=scope, dim_state_input=dim_state_input, n_actions=n_actions, is_target_net=is_target_net, src_network=src_network)
-
-	# 3 layer ff
-	if nn_name == 'ff_simple_3layer':
-		return ff_simple_3layer(sess=sess, scope=scope, dim_state_input=dim_state_input, n_actions=n_actions, is_target_net=is_target_net, src_network=src_network)
+	nn_arch = cfg_parser.get('nn', 'arch')
 
 	# 2 ff + 1 rnn + 1 ff
-	if nn_name == 'rnn_simple_2layer':
-		return rnn_simple_2layer(cfg_parser=cfg_parser, sess=sess, scope=scope, var_reuse=var_reuse, dim_state_input=dim_state_input, n_actions=n_actions, is_target_net=is_target_net, src_network=src_network)
+	if nn_arch == 'rnn_simple_2layer':
+		return rnn_simple_2layer(cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_target_net=is_target_net, src_network=src_network)
+
+	# 3 conv + (1 rnn or 1 ff) + 1 ff
+	elif nn_arch == 'conv_3layer':
+		return conv_3layer(cfg_parser, sess, scope, var_reuse, dim_state_input, n_actions, is_target_net=is_target_net, src_network=src_network)
+
+	else:
+		raise ValueError('Unhandled neural net architecture:', nn_arch)
 
 class TfSaver:
 	def __init__(self, sess, data_dir, vars_to_restore, try_to_restore=True):
@@ -69,7 +67,7 @@ class ReplayMemory:
 		if len(self.traj_mem) + 1 >= self.n_trajs_max:
 			# Deletes the first trajectory
 			self.traj_mem[0:(1+len(self.traj_mem))-self.n_trajs_max] = []
-		# Appends new multiagent trajectory, consisting of (o_joint, a_joint, r, o_joint', terminal)
+		# Appends new multiagent trajectory, consisting of (o, a, r, o', terminal)
 		self.traj_mem.append(sarsa_traj)
 
 		# Initialize the padding element based on first added sarsa_traj, for future use
@@ -77,7 +75,7 @@ class ReplayMemory:
 			self.calc_traj_pad_elem()
 			self.is_traj_pad_elem_calculated = True
 
-	# Compute a blank/zero-filled multiagent trajectory point (o_joint, a_joint, r, o_joint', terminal)
+	# Compute a blank/zero-filled multiagent trajectory point (o, a, r, o', terminal)
 	# used for zero-padding data when training RNN traces of varying length
 	def calc_traj_pad_elem(self):
 		# Use first point in first trajectory as a reference
@@ -89,9 +87,8 @@ class ReplayMemory:
 		for i_agt in xrange(0,len(self.padding_elem[0][0])):
 			self.padding_elem[0][0][i_agt] = self.padding_elem[0][0][i_agt]*0.
 
-		# Set all cur_action for all agents to 0 vector
-		for i_agt in xrange(0,len(self.padding_elem[0][1])):
-			self.padding_elem[0][1][i_agt] = self.padding_elem[0][1][i_agt]*0.
+		# Set action to 0
+		self.padding_elem[0][1] = 0
 
 		# Set reward to 0
 		self.padding_elem[0][2] = 0
@@ -105,7 +102,7 @@ class ReplayMemory:
 
 	# Samples an extended trace from a traj
 	def sample_trace(self, tracelength):
-		sampled_trajs = random.sample(self.traj_mem,self.minibatch_size)
+		sampled_trajs = random.sample(self.traj_mem, self.minibatch_size)
 		sampled_points = []
 		truetracelengths = []
 
@@ -131,9 +128,9 @@ class ReplayMemory:
 			sampled_points.extend([self.padding_elem]*num_extra_pts)
 			truetracelengths.extend([i_end-i_start])
 
-		sampled_points = np.array(sampled_points)
+		minibatch = np.reshape(sampled_points, [self.minibatch_size*tracelength, self.mem_tuple_size])
 
-		return truetracelengths, np.reshape(sampled_points,[self.minibatch_size*tracelength,self.mem_tuple_size])
+		return truetracelengths, minibatch
 
 class Data2DTraj:
 	def __init__(self):

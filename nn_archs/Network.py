@@ -10,9 +10,6 @@ class Network(object):
 		self.scope = scope
 		self.var = {}
 
-		self.hysteretic_q_learning = self.cfg_parser.getboolean('root', 'hysteretic_q_learning')
-		self.hql_alpha = float(self.cfg_parser.get('root', 'hql_alpha'))
-
 	def run_copy(self):
 		if self.copy_op is None:
 			raise Exception('Run `create_copy_op` first before copy')
