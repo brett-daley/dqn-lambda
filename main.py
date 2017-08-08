@@ -40,7 +40,7 @@ def train(cfg_parser, data_dir):
 	if not tf_saver.pre_trained:
 		q_value_traj, value_traj, init_q_value_traj = dqn_mgr.train_dqn(game)
 		q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_qvalue.txt'))
-		init_q_value_traj[0].saveData(data_dir=os.path.join(data_dir, 'teacher_init_qvalue.txt'))
+		init_q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_init_qvalue.txt'))
 		value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_value.txt'))
 
 		tf_saver.save_sess(timestep=1, save_freq=1)

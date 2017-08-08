@@ -143,17 +143,18 @@ class DRQN:
 				assert agt.nnT != None
 				agt.nnT.run_copy()
 
-		self.log_training_phase(timestep)
+		if timestep % 100 == 0:
+			self.log_training_phase(timestep)
 
 	def log_training_phase(self, timestep):
-		if timestep % 100 == 0:
-			if timestep <= self.n_pretrain_steps:
-				state = 'pre-train'
-			elif timestep > self.n_pretrain_steps and timestep <= self.n_pretrain_steps + self.n_explore_steps:
-				state = 'train (e-greedy)'
-			else:
-				state = 'train (e-greedy, min epsilon reached)'
-			print 'ITER', timestep, '| PHASE', state, '| EPSILON', self.epsilon
+		if timestep <= self.n_pretrain_steps:
+			phase = 'pre-train'
+		elif timestep <= self.n_pretrain_steps + self.n_explore_steps:
+			phase = 'train (e-greedy)'
+		else:
+			phase = 'train (e-greedy, min epsilon reached)'
+
+		print 'ITER {} | PHASE {} | EPSILON {}'.format(timestep, phase, self.epsilon)
 
 	def dec_epsilon(self, timestep):
 		# Linearly decrease epsilon

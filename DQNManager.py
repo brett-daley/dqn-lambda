@@ -29,7 +29,7 @@ class DQNManager:
 
 	def train_dqn(self, game):
 		train_freq = int(self.cfg_parser.get('nn', 'train_freq'))
-		n_train_steps = int(self.cfg_parser.get('env', 'n_train_steps'))
+		n_max_steps = int(self.cfg_parser.get('env', 'n_max_steps'))
 		minibatch_size = int(self.cfg_parser.get('dqn', 'minibatch_size'))
 
 		q_value_traj = Data2DTraj()
@@ -41,38 +41,42 @@ class DQNManager:
 		i_training_epoch = 0
 		n_games_complete = 0
 
-		for i_train_step in xrange(n_train_steps):
-			# Benchmark performance
-			if n_games_complete % self.benchmark_every_n_episodes == 0:
-				value_mean, value_stdev, init_q_mean, init_q_stdev = self.benchmark_perf(game=game, i_train_step=i_training_epoch)
-				value_traj.appendToTraj(i_training_epoch, value_mean, value_stdev)
-				init_q_value_traj.appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
+		# Initial performance benchmark
+		value_mean, value_stdev, init_q_mean, init_q_stdev = self.benchmark_perf(game=game, i_train_step=i_training_epoch)
+		value_traj.appendToTraj(i_training_epoch, value_mean, value_stdev)
+		init_q_value_traj.appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
 
+		for i_train_step in xrange(n_max_steps):
 			# Game episode completed, so reset
-			terminal = False
 			sarsa_traj = []
 
-			while not terminal:
-				# Execute game and collect a single-timestep experience
-				obs, action, reward, next_obs, terminal, _ = self.update_game(game=game, timestep=i_train_step)
-				sarsa_traj.append(np.reshape(np.array([obs, action, reward, next_obs, terminal]), [1,5]))
+			# Execute game and collect a single-timestep experience
+			obs, action, reward, next_obs, terminal, _ = self.update_game(game=game, timestep=i_train_step)
+			sarsa_traj.append(np.reshape(np.array([obs, action, reward, next_obs, terminal]), [1,5]))
 
-				# Decrease e-greedy epsilon
-				self.dqn.dec_epsilon(timestep=i_train_step)
+			# Decrease e-greedy epsilon
+			self.dqn.dec_epsilon(timestep=i_train_step)
 
-				# Train (at train_freq)
-				if n_games_complete > minibatch_size and i_train_step % train_freq == 0:
-					self.dqn.train_Q_network(timestep=i_train_step)
-					i_training_epoch += 1
+			# Train (at train_freq)
+			if i_train_step % train_freq == 0:
+				self.dqn.train_Q_network(timestep=i_train_step)
+				i_training_epoch += 1
 
-				# Plot q value convergence
-				if n_games_complete > minibatch_size and i_train_step % 1000 == 0:
-					x, y_mean, y_stdev = self.dqn.update_Q_plot(timestep=i_training_epoch)
-					q_value_traj.appendToTraj(x, y_mean, y_stdev)
+			# Plot q value convergence
+			if n_games_complete > minibatch_size and i_train_step % 1000 == 0:
+				x, y_mean, y_stdev = self.dqn.update_Q_plot(timestep=i_training_epoch)
+				q_value_traj.appendToTraj(x, y_mean, y_stdev)
 
-			# Once game completes, add entire trajectory to replay memory
-			n_games_complete += 1
-			self.dqn.replay_memory.add(sarsa_traj)
+			if terminal:
+				# Once game completes, add entire trajectory to replay memory
+				n_games_complete += 1
+				self.dqn.replay_memory.add(sarsa_traj)
+
+				# Benchmark performance
+				if n_games_complete % self.benchmark_every_n_episodes == 0:
+					value_mean, value_stdev, init_q_mean, init_q_stdev = self.benchmark_perf(game=game, i_train_step=i_training_epoch)
+					value_traj.appendToTraj(i_training_epoch, value_mean, value_stdev)
+					init_q_value_traj.appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
 
 		return q_value_traj, value_traj, init_q_value_traj
 
