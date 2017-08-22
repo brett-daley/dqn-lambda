@@ -1,26 +1,29 @@
-from rllab.baselines.linear_feature_baseline import LinearFeatureBaseline
+from rllab.baselines.zero_baseline import ZeroBaseline
 from rllab.envs.gym_env import GymEnv
 from rllab.envs.normalized_env import normalize
 from rllab.misc.instrument import stub, run_experiment_lite
 
 from sandbox.rocky.tf.envs.base import TfEnv
-from sandbox.rocky.tf.policies.categorical_mlp_policy import CategoricalMLPPolicy
+from sandbox.rocky.tf.policies.categorical_conv_policy import CategoricalConvPolicy
 from sandbox.rocky.tf.algos.trpo import TRPO
 
 stub(globals())
 
 # Need to wrap in a tf environment and force_reset to true
 # see https://github.com/openai/rllab/issues/87#issuecomment-282519288
-env = TfEnv(normalize(GymEnv("CartPole-v0", force_reset=True, record_video=False)))
+env = TfEnv(normalize(GymEnv("Pong-v0", force_reset=True, record_video=False)))
 
-policy = CategoricalMLPPolicy(
-name="policy",
-env_spec=env.spec,
-# The neural network policy should have two hidden layers, each with 32 hidden units.
-hidden_sizes=(32, 32)
+policy = CategoricalConvPolicy(
+    name='policy',
+    env_spec=env.spec,
+    conv_filters=(16, 16),
+    conv_filter_sizes=(4, 4),
+    conv_strides=(2, 2),
+    conv_pads=('VALID', 'VALID'),
+    hidden_sizes=(20,)
 )
 
-baseline = LinearFeatureBaseline(env_spec=env.spec)
+baseline = ZeroBaseline(env_spec=env.spec)
 
 algo = TRPO(
     env=env,
