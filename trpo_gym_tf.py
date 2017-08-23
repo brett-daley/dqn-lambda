@@ -1,5 +1,5 @@
 from rllab.baselines.zero_baseline import ZeroBaseline
-from rllab.envs.gym_env import GymEnv
+from atari_env import AtariEnv
 from rllab.envs.normalized_env import normalize
 from rllab.misc.instrument import stub, run_experiment_lite
 
@@ -11,7 +11,7 @@ stub(globals())
 
 # Need to wrap in a tf environment and force_reset to true
 # see https://github.com/openai/rllab/issues/87#issuecomment-282519288
-env = TfEnv(normalize(GymEnv("Pong-v0", force_reset=True, record_video=False)))
+env = TfEnv(normalize(AtariEnv('Pong-v0', force_reset=True, record_video=False)))
 
 policy = CategoricalConvPolicy(
     name='policy',
