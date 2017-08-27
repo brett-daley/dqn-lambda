@@ -1,10 +1,11 @@
 import gym
 from scipy.misc import imresize
+import numpy as np
 from rllab.envs.gym_env import *
 
 
 class AtariEnv(GymEnv):
-    def __init__(self, env_name, screen_dims=(84, 84), record_video=True, video_schedule=None, log_dir=None, record_log=True, force_reset=False):
+    def __init__(self, env_name, agent_history_length, screen_dims=(84, 84), record_video=True, video_schedule=None, log_dir=None, record_log=True, force_reset=False):
         if log_dir is None:
             if logger.get_snapshot_dir() is None:
                 logger.log('Warning: skipping Gym environment monitoring since snapshot_dir not configured.')
@@ -29,6 +30,7 @@ class AtariEnv(GymEnv):
             self.env = gym.wrappers.Monitor(self.env, log_dir, video_callable=video_schedule, force=True)
             self.monitoring = True
 
+        self._agent_history_length = agent_history_length
         self._screen_dims = screen_dims
         self._observation_space = self._create_observation_space(env)
         logger.log("observation space: {}".format(self._observation_space))
@@ -41,22 +43,58 @@ class AtariEnv(GymEnv):
         self._force_reset = force_reset
 
     def reset(self):
-        obs = super().reset()
-        return self._preprocess(obs)
+        raw_obs = super().reset()
+        return self._create_obs_from_raw(raw_obs, reset=True)
 
     def step(self, action):
+        # The superclass returns a namedtuple containing the raw observation from the Atari emulator
         step = super().step(action)
-        return step._replace(observation=self._preprocess(step.observation))
+
+        # We need to replace the raw observation with our observation
+        obs = self._create_obs_from_raw(raw_obs=step.observation)
+        return step._replace(observation=obs)
+
+    def _create_obs_from_raw(self, raw_obs, reset=False):
+        if reset:
+            # Reset the history
+            self._history = np.zeros(self._history_shape)
+        else:
+            # Discard the oldest observation
+            self._history[:-1] = self._history[1:]
+
+        # Resize the raw observation and append it to the history
+        self._history[-1] = self._resize(raw_obs)
+
+        # Return the concatenated history as the observation
+        return self._stack_history()
+
+    def _resize(self, obs):
+        # Resize the height/width of the observation (if it's an image)
+        return imresize(obs, size=self._screen_dims) if not self._obs_is_ram else obs
+
+    def _stack_history(self):
+        # The first axis is the length of the history, but we want it to be the last
+        history = np.moveaxis(self._history, source=0, destination=-1)
+
+        # Stack the history along the last axis
+        return np.concatenate(history, axis=-1)
 
     def _create_observation_space(self, env):
-        if len(env.observation_space.shape) == 1:
-            # The input is the RAM; return the original observation space
-            return convert_gym_space(env.observation_space)
-        else:
-            # The input is the screen; create a new observation space according to the desired dimensions
-            obs_shape = list(self._screen_dims) + list(env.observation_space.shape[2:])
-            space = gym.spaces.Box(low=0, high=255, shape=obs_shape)
-            return convert_gym_space(space)
+        shape = list(env.observation_space.shape)
 
-    def _preprocess(self, obs):
-        return imresize(obs, size=self._screen_dims)
+        # If the rank of the observation space is 1, the observations are RAM states of the emulator
+        self._obs_is_ram = (len(shape) == 1)
+
+        if not self._obs_is_ram:
+            # If the observations are the screen pixels, change the height/width to the given dimensions
+            shape[:2] = list(self._screen_dims)
+
+        # This represents the shape of the history buffer:
+        self._history_shape = [self._agent_history_length] + list(shape)
+
+        # Multiplying the last axis by the history length gives the final shape of the observation space
+        shape[-1] *= self._agent_history_length
+
+        # Create the observation space
+        observation_space = gym.spaces.Box(low=0, high=255, shape=shape)
+        return convert_gym_space(observation_space)
