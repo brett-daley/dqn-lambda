@@ -66,18 +66,11 @@ class AtariEnv(GymEnv):
         self._history[-1] = self._resize(raw_obs)
 
         # Return the concatenated history as the observation
-        return self._stack_history()
+        return np.concatenate(self._history, axis=-1)
 
     def _resize(self, obs):
         # Resize the height/width of the observation (if it's an image)
         return imresize(obs, size=self._screen_dims) if not self._obs_is_ram else obs
-
-    def _stack_history(self):
-        # The first axis is the length of the history, but we want it to be the last
-        history = np.moveaxis(self._history, source=0, destination=-1)
-
-        # Stack the history along the last axis
-        return np.concatenate(history, axis=-1)
 
     def _create_observation_space(self, env):
         shape = list(env.observation_space.shape)
