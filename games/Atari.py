@@ -1,6 +1,7 @@
 from Agent import Agent
 import numpy as np
 import gym
+from scipy.misc import imresize
 
 
 class Atari:
@@ -45,15 +46,20 @@ class Atari:
 	def get_obs(self):
 		return self.last_obs if self.agt_nn_is_recurrent else np.concatenate(self.history, axis=-1)
 
+	def preprocess(self, obs):
+		obs = imresize(obs, size=(84, 84))
+		return (2.0/255.0)*obs - 1
+
 	def store_obs(self, obs):
-		self.last_obs = obs
+		self.last_obs = self.preprocess(obs)
 
 		if not self.agt_nn_is_recurrent:
 			self.history[:-1] = self.history[1:]
 			self.history[-1] = self.last_obs
 
 	def reset_obs(self):
-		self.last_obs = self.env.reset()
+		obs = self.env.reset()
+		self.last_obs = self.preprocess(obs)
 
 		if not self.agt_nn_is_recurrent:
 			self.history_shape = [self.history_length] + list(self.last_obs.shape)

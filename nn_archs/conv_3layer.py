@@ -54,11 +54,8 @@ class conv_3layer(Network):
 			self.batch_size = tf.placeholder(tf.int32, name='batch_size')
 			self.truetracelengths = tf.placeholder(tf.int32, [None], name='truetracelengths') # traces are varying length, this [batch_size] vector specifies the true length for each trace in the batch
 
-			# Downsample the screen input to 84x84 pixels
-			resized_state = tf.image.resize_images(self.stateInput, [84, 84])
-
 			# These convolutional layers are described in the DQN paper
-			net = layers.convolution2d(resized_state, num_outputs=32, kernel_size=8, stride=4, activation_fn=tf.nn.relu)
+			net = layers.convolution2d(self.stateInput, num_outputs=32, kernel_size=8, stride=4, activation_fn=tf.nn.relu)
 			net = layers.convolution2d(net, num_outputs=64, kernel_size=4, stride=2, activation_fn=tf.nn.relu)
 			net = layers.convolution2d(net, num_outputs=64, kernel_size=3, stride=1, activation_fn=tf.nn.relu)
 

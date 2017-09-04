@@ -62,15 +62,18 @@ class AtariEnv(GymEnv):
             # Discard the oldest observation
             self._history[:-1] = self._history[1:]
 
-        # Resize the raw observation and append it to the history
-        self._history[-1] = self._resize(raw_obs)
+        # Preprocess the raw observation and append it to the history
+        self._history[-1] = self._preprocess(raw_obs)
 
         # Return the concatenated history as the observation
         return np.concatenate(self._history, axis=-1)
 
-    def _resize(self, obs):
-        # Resize the height/width of the observation (if it's an image)
-        return imresize(obs, size=self._screen_dims) if not self._obs_is_ram else obs
+    def _preprocess(self, obs):
+        if not self._obs_is_ram:
+            obs = imresize(obs, size=self._screen_dims)
+
+        # Normalize the values within the range [-1, 1]
+        return (2.0/255.0)*obs - 1
 
     def _create_observation_space(self, env):
         shape = list(env.observation_space.shape)
@@ -89,5 +92,5 @@ class AtariEnv(GymEnv):
         shape[-1] *= self._agent_history_length
 
         # Create the observation space
-        observation_space = gym.spaces.Box(low=0, high=255, shape=shape)
+        observation_space = gym.spaces.Box(low=-1.0, high=1.0, shape=shape)
         return convert_gym_space(observation_space)
