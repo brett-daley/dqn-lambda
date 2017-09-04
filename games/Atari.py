@@ -49,13 +49,15 @@ class Atari:
 		self.last_obs = obs
 
 		if not self.agt_nn_is_recurrent:
-			self.history = self.history[1:] + [self.last_obs]
+			self.history[:-1] = self.history[1:]
+			self.history[-1] = self.last_obs
 
 	def reset_obs(self):
 		self.last_obs = self.env.reset()
 
 		if not self.agt_nn_is_recurrent:
-			self.history = [self.last_obs]*self.history_length
+			self.history_shape = [self.history_length] + list(self.last_obs.shape)
+			self.history = np.zeros(self.history_shape)
 
 	def next(self, action):
 		# Agent executes actions
