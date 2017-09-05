@@ -51,7 +51,7 @@ class conv_3layer(Network):
 			# Input shape is a [batchsize*tracelength, dim_state_input]
 			self.stateInput = tf.placeholder(tf.float32, [None] + list(self.dim_state_input), name='stateInput')
 			self.tracelength = tf.placeholder(tf.int32, name='tracelength')
-			self.batch_size = tf.placeholder(tf.int32, name='batch_size')
+			self.batch_size = tf.placeholder(tf.int32, shape=(), name='batch_size')
 			self.truetracelengths = tf.placeholder(tf.int32, [None], name='truetracelengths') # traces are varying length, this [batch_size] vector specifies the true length for each trace in the batch
 
 			# These convolutional layers are described in the DQN paper
