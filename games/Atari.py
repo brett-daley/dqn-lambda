@@ -37,6 +37,7 @@ class Atari:
 	def reset_game(self):
 		self.discount = 1.0
 		self.value = 0.0
+		self.undiscounted_value = 0.0
 
 		self.reset_obs()
 
@@ -72,13 +73,13 @@ class Atari:
 
 		# Accrue value
 		self.value += self.discount*reward
+		self.undiscounted_value += reward
 		self.discount *= self.discount_factor
-		value_so_far = self.value # Must be here due to resetting logic below
 
-		self.store_obs(next_obs) # Must be here due to resetting logic below
+		self.store_obs(next_obs)
 
 		if terminal:
-			print '-------------- Total episode reward', value_so_far, '!--------------'
+			print '-------------- Total episode reward:', self.undiscounted_value, '(undiscounted),', self.value, '(discounted)', '!--------------'
 			self.reset_game()
 
-		return self.get_obs(), reward, terminal, value_so_far
+		return self.get_obs(), reward, terminal, self.value
