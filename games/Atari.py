@@ -49,7 +49,8 @@ class Atari:
 		return self.last_obs if self.agt_nn_is_recurrent else np.concatenate(self.history, axis=-1)
 
 	def preprocess(self, obs):
-		obs = imresize(obs, size=(84, 84))
+		if len(obs.shape) > 1:
+			obs = imresize(obs, size=(84, 84))
 		return (2.0/255.0)*obs - 1
 
 	def store_obs(self, obs):
