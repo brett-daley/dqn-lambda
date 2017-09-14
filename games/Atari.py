@@ -14,6 +14,7 @@ class Atari:
 		self.discount_factor = float(self.cfg_parser.get('dqn', 'discount'))
 		self.agt_nn_is_recurrent = self.cfg_parser.getboolean('nn', 'recurrent')
 		self.last_obs = None
+		self.exp_moving_avg = 0.0
 
 		if not self.agt_nn_is_recurrent:
 			self.history = None
@@ -79,7 +80,8 @@ class Atari:
 		self.store_obs(next_obs)
 
 		if terminal:
-			print '-------------- Total episode reward:', self.undiscounted_value, '(undiscounted),', self.value, '(discounted)', '!--------------'
+			self.exp_moving_avg = 0.01 * self.undiscounted_value + 0.99 * self.exp_moving_avg
+			print '-------------- Total episode reward:', self.undiscounted_value, '(undiscounted),', self.value, '(discounted),', self.exp_moving_avg, '(exp moving avg)', '!--------------'
 			self.reset_game()
 
 		return self.get_obs(), reward, terminal, self.value
