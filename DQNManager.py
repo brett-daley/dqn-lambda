@@ -40,6 +40,7 @@ class DQNManager:
 
 		i_training_epoch = 0
 		n_games_complete = 0
+		sarsa_traj = []
 
 		# Initial performance benchmark
 		value_mean, value_stdev, init_q_mean, init_q_stdev = self.benchmark_perf(game=game, i_train_step=i_training_epoch)
@@ -47,12 +48,9 @@ class DQNManager:
 		init_q_value_traj.appendToTraj(i_training_epoch, init_q_mean, init_q_stdev)
 
 		for i_train_step in xrange(n_max_steps):
-			# Game episode completed, so reset
-			sarsa_traj = []
-
 			# Execute game and collect a single-timestep experience
 			obs, action, reward, next_obs, terminal, _ = self.update_game(game=game, timestep=i_train_step)
-			sarsa_traj.append(np.reshape(np.array([obs, action, reward, next_obs, terminal]), [1,5]))
+			sarsa_traj.append(np.array([obs, action, reward, next_obs, int(terminal)]))
 
 			# Decrease e-greedy epsilon
 			self.dqn.dec_epsilon(timestep=i_train_step)
@@ -70,7 +68,9 @@ class DQNManager:
 			if terminal:
 				# Once game completes, add entire trajectory to replay memory
 				n_games_complete += 1
+
 				self.dqn.replay_memory.add(sarsa_traj)
+				sarsa_traj = []
 
 				# Benchmark performance
 				if n_games_complete % self.benchmark_every_n_episodes == 0:

@@ -56,7 +56,7 @@ class ReplayMemory:
 		self.minibatch_size = minibatch_size
 		self.traj_mem = []
 		self.n_trajs_max = n_trajs_max
-		self.is_traj_pad_elem_calculated = False
+		self.traj_pad_elem_is_calculated = False
 
 		self.mem_tuple_size = 5 #(o,a,r,o',t)
 
@@ -64,16 +64,17 @@ class ReplayMemory:
 		self.traj_mem = []
 
 	def add(self, sarsa_traj):
-		if len(self.traj_mem) + 1 >= self.n_trajs_max:
+		if len(self.traj_mem) >= self.n_trajs_max:
 			# Deletes the first trajectory
 			self.traj_mem[0:(1+len(self.traj_mem))-self.n_trajs_max] = []
-		# Appends new multiagent trajectory, consisting of (o, a, r, o', terminal)
+
+		# Appends new trajectory, consisting of (o, a, r, o', terminal)
 		self.traj_mem.append(sarsa_traj)
 
 		# Initialize the padding element based on first added sarsa_traj, for future use
-		if not self.is_traj_pad_elem_calculated:
+		if not self.traj_pad_elem_is_calculated:
 			self.calc_traj_pad_elem()
-			self.is_traj_pad_elem_calculated = True
+			self.traj_pad_elem_is_calculated = True
 
 	# Compute a blank/zero-filled multiagent trajectory point (o, a, r, o', terminal)
 	# used for zero-padding data when training RNN traces of varying length
@@ -81,24 +82,20 @@ class ReplayMemory:
 		# Use first point in first trajectory as a reference
 		self.padding_elem = copy.deepcopy(self.traj_mem[0][0])
 
-		# The [0] indexing below ensures that append works in self.sample_trace()
+		# Clear observation
+		self.padding_elem[0] = np.zeros_like(self.padding_elem[0])
 
-		# Set all cur_obs for all agents to 0 vector
-		for i_agt in xrange(0,len(self.padding_elem[0][0])):
-			self.padding_elem[0][0][i_agt] = self.padding_elem[0][0][i_agt]*0.
+		# Clear action
+		self.padding_elem[1] = 0.0
 
-		# Set action to 0
-		self.padding_elem[0][1] = 0
+		# Clear reward
+		self.padding_elem[2] = 0.0
 
-		# Set reward to 0
-		self.padding_elem[0][2] = 0
+		# Clear next observation
+		self.padding_elem[3] = np.zeros_like(self.padding_elem[3])
 
-		# Set next_obs for all agents to 0 vector
-		for i_agt in xrange(0,len(self.padding_elem[0][3])):
-			self.padding_elem[0][3][i_agt] = self.padding_elem[0][3][i_agt]*0.
-
-		# Set terminal signal to False
-		self.padding_elem[0][4] = False
+		# Clear terminal signal
+		self.padding_elem[4] = False
 
 	# Samples an extended trace from a traj
 	def sample_trace(self, tracelength):
@@ -107,15 +104,15 @@ class ReplayMemory:
 		truetracelengths = []
 
 		for traj in sampled_trajs:
-			i_start = np.random.randint(-1*tracelength+1,len(traj))
-			i_end = i_start+tracelength
+			i_start = np.random.randint(1-tracelength, len(traj))
+			i_end = i_start + tracelength
 
 			num_extra_pts = 0
 
 			# Starting index is before first element in trajectory
 			if i_start < 0:
 				# Since tensorflow sequence_length RNN doesn't support front-padding (yet), keep the relevant elements at front, and set the suffix padding appropriately
-				num_extra_pts += -1*i_start # points with negative indices are all extra, this just is a quick way to count them
+				num_extra_pts = -i_start # points with negative indices are all extra, this just is a quick way to count them
 				i_start = 0 # ignores points with negative index
 
 			# Ending index is after final element in trajectory
