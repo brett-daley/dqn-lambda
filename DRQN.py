@@ -32,9 +32,8 @@ class DRQN:
 		self.agt = agt
 		self.tracelength = int(self.cfg_parser.get('nn', 'agent_history_length')) if self.agt.nn.is_rnn else 1
 
-		# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
-		self.n_trajs_max = int(self.cfg_parser.get('dqn', 'replay_memory_size'))
-		self.replay_memory = ReplayMemory(n_trajs_max=self.n_trajs_max, minibatch_size=self.minibatch_size)
+		self.replay_memory_capacity = int(self.cfg_parser.get('dqn', 'replay_memory_capacity'))
+		self.replay_memory = ReplayMemory(self.replay_memory_capacity, self.minibatch_size)
 
 		# Init plotting
 		self.plot_qvalue_dqn = LineplotDynamic('Training Epoch', 'Q', '')
@@ -52,7 +51,7 @@ class DRQN:
 
 		if s_batch_prespecified is None:
 			# Since tracelength of 1 used, this ensures that truetracelengths = [1,....,1] and no masking required below
-			_, minibatch = self.replay_memory.sample_trace(tracelength=1)
+			_, minibatch = self.replay_memory.sample_traces(tracelength=1)
 			s_batch = np.array([sample[0] for sample in minibatch])
 			minibatch_size_plot = self.minibatch_size
 		else:
@@ -76,7 +75,7 @@ class DRQN:
 		return x, y_mean, y_stdev
 
 	def get_processed_minibatch(self):
-		truetracelengths, minibatch = self.replay_memory.sample_trace(self.tracelength)
+		truetracelengths, minibatch = self.replay_memory.sample_traces(self.tracelength)
 
 		s_batch = np.array([sample[0] for sample in minibatch])
 		a_batch = minibatch[:,1]

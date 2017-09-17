@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 import os
-import copy
 import random
 from rnn_simple_2layer import rnn_simple_2layer
 from conv_3layer import conv_3layer
@@ -52,80 +51,76 @@ class TfSaver:
 			print 'Successfully saved tf session'
 
 class ReplayMemory:
-	def __init__(self, n_trajs_max, minibatch_size):
-		self.minibatch_size = minibatch_size
-		self.traj_mem = []
-		self.n_trajs_max = n_trajs_max
-		self.traj_pad_elem_is_calculated = False
+	def __init__(self, capacity, minibatch_size):
+		self.capacity = capacity              # Maximum number of experiences to store
+		self.minibatch_size = minibatch_size  # Number of traces to sample at once
 
-		self.mem_tuple_size = 5 #(o,a,r,o',t)
+		self.reset()
 
 	def reset(self):
-		self.traj_mem = []
+		self.memory = None      # Holds the experiences
+		self.size = 0           # Number of experiences currently in the memory
+		self.insertion_ptr = 0  # Index of the next experience to be overwritten
 
-	def add(self, sarsa_traj):
-		if len(self.traj_mem) >= self.n_trajs_max:
-			# Deletes the first trajectory
-			self.traj_mem[0:(1+len(self.traj_mem))-self.n_trajs_max] = []
+	def add(self, obs, action, reward, next_obs, terminal):
+		if self.memory is None:
+			self._initialize_memory(obs.shape)
 
-		# Appends new trajectory, consisting of (o, a, r, o', terminal)
-		self.traj_mem.append(sarsa_traj)
+		self.memory[self.insertion_ptr] = np.array([obs, action, reward, next_obs, terminal])
 
-		# Initialize the padding element based on first added sarsa_traj, for future use
-		if not self.traj_pad_elem_is_calculated:
-			self.calc_traj_pad_elem()
-			self.traj_pad_elem_is_calculated = True
+		if self.size < self.capacity:
+			self.size += 1
 
-	# Compute a blank/zero-filled multiagent trajectory point (o, a, r, o', terminal)
-	# used for zero-padding data when training RNN traces of varying length
-	def calc_traj_pad_elem(self):
-		# Use first point in first trajectory as a reference
-		self.padding_elem = copy.deepcopy(self.traj_mem[0][0])
+		# Increment the insertion pointer, wrapping around if the end is reached
+		self.insertion_ptr = (self.insertion_ptr + 1) % self.capacity
 
-		# Clear observation
-		self.padding_elem[0] = np.zeros_like(self.padding_elem[0])
+	def _initialize_memory(self, obs_shape):
+		# Compute a blank/zero-filled agent experience
+		# for zero-padding data when training RNN traces of varying length
+		self.null_experience = [
+			np.zeros(obs_shape), # Observation
+			0,                   # Action
+			0.0,                 # Reward
+			np.zeros(obs_shape), # Next observation
+			False                # Terminal signal
+		]
 
-		# Clear action
-		self.padding_elem[1] = 0.0
+		# Pre-allocate the replay memory; this has better performance and we'll also know immediately if it's too big
+		self.memory = np.array([self.null_experience] * self.capacity)
 
-		# Clear reward
-		self.padding_elem[2] = 0.0
-
-		# Clear next observation
-		self.padding_elem[3] = np.zeros_like(self.padding_elem[3])
-
-		# Clear terminal signal
-		self.padding_elem[4] = False
-
-	# Samples an extended trace from a traj
-	def sample_trace(self, tracelength):
-		sampled_trajs = random.sample(self.traj_mem, self.minibatch_size)
-		sampled_points = []
+	def sample_traces(self, tracelength):
+		sampled_traces = []
 		truetracelengths = []
 
-		for traj in sampled_trajs:
-			i_start = np.random.randint(1-tracelength, len(traj))
-			i_end = i_start + tracelength
+		for _ in xrange(self.minibatch_size):
+			# Randomly sample a starting index for this trace
+			start_idx = np.random.randint(1-tracelength, self.size)
+			end_idx = start_idx + tracelength
 
-			num_extra_pts = 0
+			n_extra_experiences = 0
 
-			# Starting index is before first element in trajectory
-			if i_start < 0:
-				# Since tensorflow sequence_length RNN doesn't support front-padding (yet), keep the relevant elements at front, and set the suffix padding appropriately
-				num_extra_pts = -i_start # points with negative indices are all extra, this just is a quick way to count them
-				i_start = 0 # ignores points with negative index
+			if start_idx < 0:
+				# Starting index is before first experience in memory
+				# Since tensorflow sequence_length RNN doesn't support front-padding (yet),
+				# keep the relevant experiences at front, and set the suffix padding appropriately
+				n_extra_experiences = -start_idx  # Points with negative indices are all extra, this just is a quick way to count them
+				start_idx = 0                     # Ignore points with negative index
 
-			# Ending index is after final element in trajectory
-			if i_end > len(traj):
-				num_extra_pts += i_end - len(traj) 
-				i_end = len(traj) # ignore points beyond trajectory length
+			if end_idx > self.size:
+				# Ending index is after final experience in memory
+				n_extra_experiences += end_idx - self.size
+				end_idx = self.size  # Ignore points beyond memory size
 
-			# Append points and apply zero padding to suffix 
-			sampled_points.extend(traj[i_start:i_end])
-			sampled_points.extend([self.padding_elem]*num_extra_pts)
-			truetracelengths.extend([i_end-i_start])
+			# Add zero-padded trace to minibatch
+			trace = self.memory[start_idx:end_idx]
+			zero_padding = [self.null_experience]*n_extra_experiences
+			sampled_traces.extend(trace)
+			sampled_traces.extend(zero_padding)
 
-		minibatch = np.reshape(sampled_points, [self.minibatch_size*tracelength, self.mem_tuple_size])
+			# Record the number of non-null experiences in this trace
+			truetracelengths.append(end_idx-start_idx)
+
+		minibatch = np.reshape(sampled_traces, [self.minibatch_size*tracelength, -1])
 
 		return truetracelengths, minibatch
 
