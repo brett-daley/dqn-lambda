@@ -14,7 +14,7 @@ class Atari:
 		self.discount_factor = float(self.cfg_parser.get('dqn', 'discount'))
 		self.agt_nn_is_recurrent = self.cfg_parser.getboolean('nn', 'recurrent')
 		self.last_obs = None
-		self.exp_moving_avg = 0.0
+		self.mov_avg_undisc_return = 0.0
 
 		if not self.agt_nn_is_recurrent:
 			self.history = None
@@ -37,8 +37,8 @@ class Atari:
 
 	def reset_game(self):
 		self.discount = 1.0
-		self.value = 0.0
-		self.undiscounted_value = 0.0
+		self.undisc_return = 0.0
+		self.disc_return = 0.0
 
 		self.reset_obs()
 
@@ -74,15 +74,20 @@ class Atari:
 		self.env.render()
 
 		# Accrue value
-		self.value += self.discount*reward
-		self.undiscounted_value += reward
+		self.undisc_return += reward
+		self.disc_return += self.discount*reward
 		self.discount *= self.discount_factor
 
+		# Store this observation for non-recurrent case
 		self.store_obs(next_obs)
 
+		# Must be here for reset logic below
+		undisc_return = self.undisc_return
+		disc_return = self.disc_return
+
 		if terminal:
-			self.exp_moving_avg = 0.01 * self.undiscounted_value + 0.99 * self.exp_moving_avg
-			print '-------------- Total episode reward:', self.undiscounted_value, '(undiscounted),', self.value, '(discounted),', self.exp_moving_avg, '(exp moving avg)', '!--------------'
+			self.mov_avg_undisc_return = 0.05 * undisc_return + 0.95 * self.mov_avg_undisc_return
+			print '-------------- Episode return:', disc_return, '(discounted),', undisc_return, '(undiscounted),', self.mov_avg_undisc_return, '(undiscounted, moving avg)', '!--------------'
 			self.reset_game()
 
-		return self.get_obs(), reward, terminal, self.value
+		return self.get_obs(), reward, terminal, disc_return, undisc_return, self.mov_avg_undisc_return

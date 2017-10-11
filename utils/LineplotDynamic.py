@@ -31,7 +31,7 @@ class LineplotDynamic:
 		self.filled_lines_dict[hl_name] = self.ax.fill_between(cur_data.x_traj, cur_data.y_lower_traj, cur_data.y_upper_traj, facecolor=cur_hl.get_color(), alpha=0.3)
 		cur_hl.set_ydata(cur_data.y_mean_traj)
 
-	def update(self, hl_name, x_new, y_new, y_stdev_new=0, label ='', init_at_origin=False):
+	def update(self, hl_name, x_new, y_new, y_stdev_new=0, label='', init_at_origin=False):
 		plt.sca(self.ax)
 
 		# New plot handle

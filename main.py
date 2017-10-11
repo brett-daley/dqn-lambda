@@ -30,26 +30,35 @@ def train(cfg_parser, data_dir):
 	sess = tf.InteractiveSession()
 
 	# Init game and DQN
-	game = Atari(cfg_parser=cfg_parser, sess=sess)
-	dqn_mgr = DQNManager(cfg_parser=cfg_parser, n_actions=game.n_actions, game=game, sess=sess)
+	game = Atari(cfg_parser, sess)
+	dqn_mgr = DQNManager(cfg_parser, sess, game, n_actions=game.n_actions)
 
 	# Automatically loads checkpoint if data_dir contains it. Otherwise, starts fresh.
-	tf_saver = TfSaver(sess=sess, data_dir=data_dir, vars_to_restore=dqn_mgr.teacher_vars)
+	tf_saver = TfSaver(sess, data_dir, vars_to_restore=dqn_mgr.teacher_vars)
 
 	# Skip training if tf_saver loaded pre-trained model
 	if not tf_saver.pre_trained:
-		q_value_traj, value_traj, init_q_value_traj = dqn_mgr.train_dqn(game)
-		q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_qvalue.txt'))
-		init_q_value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_init_qvalue.txt'))
-		value_traj.saveData(data_dir=os.path.join(data_dir, 'teacher_value.txt'))
+		traj_predicted_disc_return, traj_actual_disc_return, traj_undisc_return, traj_mov_avg_undisc_return = dqn_mgr.train_dqn(game)
+
+		traj_predicted_disc_return.saveData(data_dir=os.path.join(data_dir, 'traj_predicted_disc_return.txt'))
+		traj_actual_disc_return.saveData(data_dir=os.path.join(data_dir, 'traj_actual_disc_return.txt'))
+		traj_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_undisc_return.txt'))
+		traj_mov_avg_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_mov_avg_disc_return.txt'))
 
 		tf_saver.save_sess(timestep=1, save_freq=1)
 	else:
-		m_plotter = Plotter(label_x='iter', label_y='Actual Value Received', title='', adjust_right=0.73)
-		m_plotter.update_palette(n_colors=1)
-		m_plotter.add_data_to_plot(data_dir=data_dir, data_file='teacher_value.txt', label='Task')
-		m_plotter.update_legend()
-		plt.show()
+		plots = [['Predicted Discounted Episode Return', 'traj_predicted_disc_return.txt'],
+				 ['Actual Discounted Episode Return', 'traj_actual_disc_return.txt'],
+				 ['Undiscounted Episode Return', 'traj_undisc_return.txt'],
+				 ['Undiscounted Episode Return (Moving Avg)', 'traj_mov_avg_disc_return.txt']]
+
+		for title, data_file in plots:
+			p = Plotter(label_x='Timestep', label_y='Return', title=title, adjust_right=0.73)
+			p.update_palette(n_colors=1)
+			p.add_data_to_plot(data_dir, data_file, label=None)
+			p.update_legend()
+
+		plt.show(block=True)
 
 def main():
 	# Change this to load a pre-trained model
