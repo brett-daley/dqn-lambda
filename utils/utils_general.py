@@ -21,34 +21,6 @@ def create_specific_nn(cfg_parser, sess, scope, var_reuse, dim_state_input, n_ac
 	else:
 		raise ValueError('Unhandled neural net architecture:', nn_arch)
 
-class TfSaver:
-	def __init__(self, sess, data_dir, vars_to_restore, try_to_restore=True):
-		# Note: this should only be used for LOADING during distillation phase, and SAVING during task specialization phase
-		# Do NOT use this to load during task specialization phase (since each task has its own network, and each  meta files contain all the tasks' networks)
-		self.data_dir = data_dir
-		self.sess = sess
-
-		if not os.path.exists(self.data_dir):
-			os.makedirs(self.data_dir)
-
-		self.saver = tf.train.Saver(max_to_keep=5, var_list=vars_to_restore)
-		checkpoint = tf.train.get_checkpoint_state(self.data_dir)
-
-		# Load checkpoint with latest timestamp (not latest training #! latest timestamp!) in folder if it exists. 
-		# Otherwise, just create directory for future saving.
-		if checkpoint and checkpoint.model_checkpoint_path and try_to_restore:
-			self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
-			self.pre_trained = True
-			print '------- Successfully loaded:', checkpoint.model_checkpoint_path
-		else:
-			self.pre_trained = False
-			print '------- Could not find old network weights for', data_dir, ' Training from scratch (could be distiller though!).' # First run
-
-	def save_sess(self, timestep, save_freq):
-		# save network every save_freq iterations
-		if timestep % save_freq == 0:
-			self.saver.save(self.sess, os.path.join(self.data_dir, 'networks-mtsa'), global_step=timestep)
-			print 'Successfully saved tf session'
 
 class Data2DTraj:
 	def __init__(self):
