@@ -45,9 +45,16 @@ def train(cfg_parser, data_dir):
 	traj_predicted_disc_return, traj_actual_disc_return, traj_undisc_return, traj_mov_avg_undisc_return = dqn_mgr.train_dqn(game)
 
 	traj_predicted_disc_return.saveData(data_dir=os.path.join(data_dir, 'traj_predicted_disc_return.txt'))
+	dqn_mgr.dqn.plot_predicted_disc_return.fig.savefig(os.path.join(data_dir, 'plot_predicted_disc_return.png'), bbox_inches='tight')
+
 	traj_actual_disc_return.saveData(data_dir=os.path.join(data_dir, 'traj_actual_disc_return.txt'))
+	dqn_mgr.dqn.plot_actual_disc_return.fig.savefig(os.path.join(data_dir, 'plot_actual_disc_return.png'), bbox_inches='tight')
+
 	traj_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_undisc_return.txt'))
+	dqn_mgr.dqn.plot_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_undisc_return.png'), bbox_inches='tight')
+
 	traj_mov_avg_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_mov_avg_disc_return.txt'))
+	dqn_mgr.dqn.plot_mov_avg_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_mov_avg_disc_return.png'), bbox_inches='tight')
 
 	saver = tf.train.Saver()
 	saver.save(sess, save_path=os.path.join(data_dir, 'model'))
