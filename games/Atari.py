@@ -6,12 +6,14 @@ import logging
 
 
 class Atari:
-	def __init__(self, cfg_parser, sess):
+	def __init__(self, cfg_parser, sess, render):
 		self.cfg_parser = cfg_parser
 		self.logger = logging.getLogger()
 
 		self.env_name = self.cfg_parser.get('env', 'name')
 		self.env = gym.make(self.env_name)
+		self.render = render
+
 		self.n_actions = self.env.action_space.n
 		self.discount_factor = float(self.cfg_parser.get('dqn', 'discount'))
 		self.agt_nn_is_recurrent = self.cfg_parser.getboolean('nn', 'recurrent')
@@ -73,7 +75,9 @@ class Atari:
 	def next(self, action):
 		# Agent executes actions
 		next_obs, reward, terminal, info = self.env.step(action)
-		self.env.render()
+
+		if self.render:
+			self.env.render()
 
 		# Accrue value
 		self.undisc_return += reward

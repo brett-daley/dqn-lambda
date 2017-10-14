@@ -13,6 +13,7 @@ from plotting import Plotter
 import matplotlib.pyplot as plt
 import argparse
 import logging
+import warnings; warnings.filterwarnings('ignore')
 
 
 def configure_logger(log_file):
@@ -30,46 +31,53 @@ def configure_logger(log_file):
 
 
 def load_plots(data_dir):
-	plots = [['Predicted Discounted Episode Return', 'traj_predicted_disc_return.txt'],
-			 ['Actual Discounted Episode Return', 'traj_actual_disc_return.txt'],
-			 ['Undiscounted Episode Return', 'traj_undisc_return.txt'],
-			 ['Undiscounted Episode Return (Moving Avg)', 'traj_mov_avg_disc_return.txt']]
+	plots = [['Predicted Discounted Episode Return', 'predicted_disc_return'],
+			 ['Actual Discounted Episode Return', 'actual_disc_return'],
+			 ['Undiscounted Episode Return', 'undisc_return'],
+			 ['Undiscounted Episode Return (Moving Avg)', 'mov_avg_disc_return']]
 
-	for title, data_file in plots:
-		data_file_path = os.path.join(data_dir, data_file)
+	for plot_title, file_basename in plots:
+		data_file = os.path.join(data_dir, 'traj_' + file_basename + '.txt')
+		plot_file = os.path.join(data_dir, 'plot_' + file_basename + '.png')
 
-		if not os.path.exists(data_file_path):
-			print 'Could not find', data_file_path, '... skipping'
-			continue
+		if not os.path.exists(data_file):
+			print 'Could not find', data_file, '... skipping'
+		else:
+			p = Plotter(label_x='Timestep', label_y='Return', title=plot_title, adjust_right=0.73)
+			p.update_palette(n_colors=1)
+			p.add_data_to_plot('.', data_file, label=None)
+			p.update_legend()
+			print 'Successfully generated plot from', data_file
 
-		p = Plotter(label_x='Timestep', label_y='Return', title=title, adjust_right=0.73)
-		p.update_palette(n_colors=1)
-		p.add_data_to_plot(data_dir, data_file, label=None)
-		p.update_legend()
-		print 'Successfully generated plot from', data_file_path
+			if not os.path.exists(plot_file):
+				p.fig.savefig(plot_file, bbox_inches='tight', pad_inches=0)
+				print 'Saved plot in', plot_file
+			else:
+				print plot_file, 'already exists'
+
+		print
 
 	plt.show(block=True)
 
 
-def train(cfg_parser, data_dir):
+def train(cfg_parser, data_dir, render):
 	sess = tf.InteractiveSession()
 
-	game = Atari(cfg_parser, sess)
-	dqn_mgr = DQNManager(cfg_parser, sess, game, n_actions=game.n_actions)
+	game = Atari(cfg_parser, sess, render)
+	dqn_mgr = DQNManager(cfg_parser, sess, game, render)
 
 	traj_predicted_disc_return, traj_actual_disc_return, traj_undisc_return, traj_mov_avg_undisc_return = dqn_mgr.train_dqn(game)
 
 	traj_predicted_disc_return.saveData(data_dir=os.path.join(data_dir, 'traj_predicted_disc_return.txt'))
-	dqn_mgr.dqn.plot_predicted_disc_return.fig.savefig(os.path.join(data_dir, 'plot_predicted_disc_return.png'), bbox_inches='tight')
-
 	traj_actual_disc_return.saveData(data_dir=os.path.join(data_dir, 'traj_actual_disc_return.txt'))
-	dqn_mgr.dqn.plot_actual_disc_return.fig.savefig(os.path.join(data_dir, 'plot_actual_disc_return.png'), bbox_inches='tight')
-
 	traj_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_undisc_return.txt'))
-	dqn_mgr.dqn.plot_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_undisc_return.png'), bbox_inches='tight')
-
 	traj_mov_avg_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_mov_avg_disc_return.txt'))
-	dqn_mgr.dqn.plot_mov_avg_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_mov_avg_disc_return.png'), bbox_inches='tight')
+
+	if render:
+		dqn_mgr.dqn.plot_predicted_disc_return.fig.savefig(os.path.join(data_dir, 'plot_predicted_disc_return.png'), bbox_inches='tight')
+		dqn_mgr.dqn.plot_actual_disc_return.fig.savefig(os.path.join(data_dir, 'plot_actual_disc_return.png'), bbox_inches='tight')
+		dqn_mgr.dqn.plot_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_undisc_return.png'), bbox_inches='tight')
+		dqn_mgr.dqn.plot_mov_avg_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_mov_avg_disc_return.png'), bbox_inches='tight')
 
 	saver = tf.train.Saver()
 	saver.save(sess, save_path=os.path.join(data_dir, 'model'))
@@ -80,7 +88,7 @@ def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('job_name', type=str)
 	parser.add_argument('--overwrite', action='store_true')
-	# TODO: add option for disabling rendering
+	parser.add_argument('--no-render', action='store_true')
 	args = parser.parse_args()
 
 	data_dir = os.path.join('results', args.job_name)
@@ -107,7 +115,7 @@ def main():
 		cfg_path_backup = os.path.join(data_dir, os.path.basename(cfg_path))
 		shutil.copyfile(cfg_path, cfg_path_backup)
 
-		train(cfg_parser, data_dir)
+		train(cfg_parser, data_dir, render=(not args.no_render))
 
 	else:
 		config_list = glob.glob(os.path.join(data_dir, 'config_*'))

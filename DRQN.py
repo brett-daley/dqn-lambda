@@ -48,27 +48,15 @@ class DRQN:
 		self.plot_undisc_return = LineplotDynamic(title='Undiscounted Episode Return', label_x='Timestep', label_y='Return')
 		self.plot_mov_avg_undisc_return = LineplotDynamic(title='Undiscounted Episode Return (Moving Avg)', label_x='Timestep', label_y='Return')
 
-	def update_Q_plot(self, timestep, s_batch_prespecified=None):
-		if s_batch_prespecified is None:
-			# Since tracelength of 1 used, this ensures that truetracelengths = [1,....,1] and no masking required below
-			_, minibatch = self.replay_memory.sample_traces(tracelength=1)
-			s_batch = np.array([sample[0] for sample in minibatch])
-			minibatch_size_plot = self.minibatch_size
-		else:
-			s_batch = s_batch_prespecified
-			minibatch_size_plot = len(s_batch_prespecified)
+	def predict_disc_return(self, s_batch):
+		minibatch_size_plot = len(s_batch)
 
 		y = self.agt.nn.Qmax.eval(feed_dict={self.agt.nn.stateInput: s_batch,
 											 self.agt.nn.tracelength: 1,
 											 self.agt.nn.truetracelengths: [1]*minibatch_size_plot,
 											 self.agt.nn.batch_size: minibatch_size_plot})
 
-		y_mean = np.mean(y)
-		y_stdev = np.std(y)
-
-		self.plot_predicted_disc_return.update(hl_name=None, label=None, x_new=timestep, y_new=y_mean, y_stdev_new=y_stdev)
-
-		return y_mean, y_stdev
+		return np.mean(y), np.std(y)
 
 	def get_processed_minibatch(self):
 		truetracelengths, minibatch = self.replay_memory.sample_traces(self.tracelength)

@@ -6,15 +6,16 @@ import logging
 
 
 class DQNManager:
-	def __init__(self, cfg_parser, sess, game, n_actions):
+	def __init__(self, cfg_parser, sess, game, render):
 		self.cfg_parser = cfg_parser
 		self.sess = sess
 		self.logger = logging.getLogger()
+		self.render = render
 
 		self.benchmark_every_n_episodes = int(self.cfg_parser.get('env', 'benchmark_every_n_episodes'))
 		self.benchmark_for_n_episodes = int(self.cfg_parser.get('env', 'benchmark_for_n_episodes'))
 
-		self.dqn = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=n_actions, agt=game.agt)
+		self.dqn = DRQN(cfg_parser=cfg_parser, sess=self.sess, n_actions=game.n_actions, agt=game.agt)
 
 		# Create a list of trainable teacher task variables, so TfSaver can later save and restore them
 		self.teacher_vars = [v for v in tf.trainable_variables()]
@@ -36,7 +37,9 @@ class DQNManager:
 		traj_actual_disc_return = Data2DTraj()
 		traj_undisc_return = Data2DTraj()
 		traj_mov_avg_undisc_return = Data2DTraj()
-		self.dqn.init_plots()
+
+		if self.render:
+			self.dqn.init_plots()
 
 		game.init_agt_nnT()
 
@@ -59,8 +62,9 @@ class DQNManager:
 			if terminal:
 				n_games_complete += 1
 
-				self.dqn.plot_undisc_return.update(hl_name=None, label=None, x_new=i_train_step, y_new=undisc_return)
-				self.dqn.plot_mov_avg_undisc_return.update(hl_name=None, label=None, x_new=i_train_step, y_new=mov_avg_undisc_return)
+				if self.render:
+					self.dqn.plot_undisc_return.update(hl_name=None, label=None, x_new=i_train_step, y_new=undisc_return)
+					self.dqn.plot_mov_avg_undisc_return.update(hl_name=None, label=None, x_new=i_train_step, y_new=mov_avg_undisc_return)
 
 				traj_undisc_return.appendToTraj(i_train_step, undisc_return, y_stdev=0)
 				traj_mov_avg_undisc_return.appendToTraj(i_train_step, mov_avg_undisc_return, y_stdev=0)
@@ -98,7 +102,10 @@ class DQNManager:
 		mean_actual_disc_return = np.mean(all_disc_returns)
 		stdev_actual_disc_return = np.std(all_disc_returns)
 
-		mean_predicted_disc_return, stdev_predicted_disc_return = self.dqn.update_Q_plot(timestep, s_batch_prespecified=s_batch_initial)
-		self.dqn.plot_actual_disc_return.update(hl_name=None, label=None, x_new=timestep, y_new=mean_actual_disc_return, y_stdev_new=stdev_actual_disc_return, init_at_origin=False)
+		mean_predicted_disc_return, stdev_predicted_disc_return = self.dqn.predict_disc_return(s_batch_initial)
+
+		if self.render:
+			self.plot_predicted_disc_return.update(hl_name=None, label=None, x_new=timestep, y_new=y_mean, y_stdev_new=y_stdev)
+			self.dqn.plot_actual_disc_return.update(hl_name=None, label=None, x_new=timestep, y_new=mean_actual_disc_return, y_stdev_new=stdev_actual_disc_return)
 
 		return mean_predicted_disc_return, stdev_predicted_disc_return, mean_actual_disc_return, stdev_actual_disc_return
