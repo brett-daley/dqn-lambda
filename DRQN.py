@@ -4,12 +4,14 @@ import random
 import os
 from LineplotDynamic import LineplotDynamic
 from ReplayMemory import ReplayMemory
+import logging
 
 
 class DRQN:
 	def __init__(self, cfg_parser, n_actions, sess, agt):
 		self.cfg_parser = cfg_parser
 		self.sess = sess
+		self.logger = logging.getLogger()
 
 		# Initial phase where no training occurs. Allows population of replay memory before training.
 		self.n_pretrain_steps = int(self.cfg_parser.get('env', 'n_pretrain_steps'))
@@ -147,7 +149,7 @@ class DRQN:
 		else:
 			phase = 'train (e-greedy, min epsilon reached)'
 
-		print 'ITER {} | PHASE {} | EPSILON {}'.format(timestep, phase, self.epsilon)
+		self.logger.info('ITER {} | PHASE {} | EPSILON {}'.format(timestep, phase, self.epsilon))
 
 	def dec_epsilon(self, timestep):
 		# Linearly decrease epsilon

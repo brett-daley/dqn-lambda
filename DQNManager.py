@@ -2,13 +2,14 @@ from DRQN import DRQN
 import tensorflow as tf
 from utils_general import Data2DTraj
 import numpy as np
-import time
+import logging
 
 
 class DQNManager:
 	def __init__(self, cfg_parser, sess, game, n_actions):
 		self.cfg_parser = cfg_parser
 		self.sess = sess
+		self.logger = logging.getLogger()
 
 		self.benchmark_every_n_episodes = int(self.cfg_parser.get('env', 'benchmark_every_n_episodes'))
 		self.benchmark_for_n_episodes = int(self.cfg_parser.get('env', 'benchmark_for_n_episodes'))
@@ -73,7 +74,7 @@ class DQNManager:
 		return traj_predicted_disc_return, traj_actual_disc_return, traj_undisc_return, traj_mov_avg_undisc_return
 
 	def benchmark_perf(self, game, timestep):
-		print '----- Benchmarking performance -----'
+		self.logger.info('----- Benchmarking performance -----')
 		all_disc_returns = np.array([])
 
 		# Initial states and actions taken -- for plotting predicted value against actual

@@ -12,6 +12,21 @@ from ConfigParser import SafeConfigParser
 from plotting import Plotter
 import matplotlib.pyplot as plt
 import argparse
+import logging
+
+
+def configure_logger(log_file):
+	logger = logging.getLogger()
+	logger.setLevel(logging.DEBUG)
+
+	fh = logging.FileHandler(filename=log_file)
+	logger.addHandler(fh)
+
+	formatter = logging.Formatter('%(message)s')
+	for h in logger.handlers:
+		h.setFormatter(formatter)
+
+	return logger
 
 
 def load_plots(data_dir):
@@ -58,7 +73,7 @@ def train(cfg_parser, data_dir):
 
 	saver = tf.train.Saver()
 	saver.save(sess, save_path=os.path.join(data_dir, 'model'))
-	print 'Successfully saved Tensorflow model in', data_dir
+	logging.getLogger().info('Successfully saved Tensorflow model in {}'.format(data_dir))
 
 
 def main():
@@ -75,9 +90,13 @@ def main():
 		shutil.rmtree(data_dir)
 
 	if not os.path.exists(data_dir):
-		print 'Creating new results directory:', data_dir
-
 		os.makedirs(data_dir)
+
+		log_file = os.path.join(data_dir, 'output.txt')
+		open(log_file, 'a').close()
+
+		logger = configure_logger(log_file)
+		logger.info('Creating new results directory: {}'.format(data_dir))
 
 		# TODO: don't hardcode config name
 		cfg_path = './games/config_Atari.ini'

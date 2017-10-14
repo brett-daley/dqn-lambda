@@ -2,11 +2,13 @@ from Agent import Agent
 import numpy as np
 import gym
 from scipy.misc import imresize
+import logging
 
 
 class Atari:
 	def __init__(self, cfg_parser, sess):
 		self.cfg_parser = cfg_parser
+		self.logger = logging.getLogger()
 
 		self.env_name = self.cfg_parser.get('env', 'name')
 		self.env = gym.make(self.env_name)
@@ -87,7 +89,7 @@ class Atari:
 
 		if terminal:
 			self.mov_avg_undisc_return = 0.05 * undisc_return + 0.95 * self.mov_avg_undisc_return
-			print '-------------- Episode return:', disc_return, '(discounted),', undisc_return, '(undiscounted),', self.mov_avg_undisc_return, '(undiscounted, moving avg)', '!--------------'
+			self.logger.info('-------------- Episode return: {} (discounted), {} (undiscounted), {} (undiscounted, moving avg) !--------------'.format(disc_return, undisc_return, self.mov_avg_undisc_return))
 			self.reset_game()
 
 		return self.get_obs(), reward, terminal, disc_return, undisc_return, self.mov_avg_undisc_return
