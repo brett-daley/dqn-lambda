@@ -1,6 +1,7 @@
 from Agent import Agent
 import numpy as np
 import gym
+from scipy.misc import imresize
 
 
 class Atari:
@@ -36,6 +37,7 @@ class Atari:
 	def reset_game(self):
 		self.discount = 1.0
 		self.value = 0.0
+		self.undiscounted_value = 0.0
 
 		self.reset_obs()
 
@@ -45,17 +47,24 @@ class Atari:
 	def get_obs(self):
 		return self.last_obs if self.agt_nn_is_recurrent else np.concatenate(self.history, axis=-1)
 
+	def preprocess(self, obs):
+		obs = imresize(obs, size=(84, 84))
+		return (2.0/255.0)*obs - 1
+
 	def store_obs(self, obs):
-		self.last_obs = obs
+		self.last_obs = self.preprocess(obs)
 
 		if not self.agt_nn_is_recurrent:
-			self.history = self.history[1:] + [self.last_obs]
+			self.history[:-1] = self.history[1:]
+			self.history[-1] = self.last_obs
 
 	def reset_obs(self):
-		self.last_obs = self.env.reset()
+		obs = self.env.reset()
+		self.last_obs = self.preprocess(obs)
 
 		if not self.agt_nn_is_recurrent:
-			self.history = [self.last_obs]*self.history_length
+			self.history_shape = [self.history_length] + list(self.last_obs.shape)
+			self.history = np.zeros(self.history_shape)
 
 	def next(self, action):
 		# Agent executes actions
@@ -64,13 +73,13 @@ class Atari:
 
 		# Accrue value
 		self.value += self.discount*reward
+		self.undiscounted_value += reward
 		self.discount *= self.discount_factor
-		value_so_far = self.value # Must be here due to resetting logic below
 
-		self.store_obs(next_obs) # Must be here due to resetting logic below
+		self.store_obs(next_obs)
 
 		if terminal:
-			print '-------------- Total episode reward', value_so_far, '!--------------'
+			print '-------------- Total episode reward:', self.undiscounted_value, '(undiscounted),', self.value, '(discounted)', '!--------------'
 			self.reset_game()
 
-		return self.get_obs(), reward, terminal, value_so_far
+		return self.get_obs(), reward, terminal, self.value
