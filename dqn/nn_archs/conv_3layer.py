@@ -41,7 +41,7 @@ class conv_3layer(Network):
 		self.td_err = self.yInput - self.Q_Action
 		self.cost = tf.reduce_mean(tf.square(self.td_err) * self.seqlen_mask)
 
-		self.trainStep = tf.train.AdamOptimizer(learning_rate=0.001).minimize(self.cost)
+		self.trainStep = tf.train.RMSPropOptimizer(learning_rate=0.00025, decay=0.95, momentum=0.95, epsilon=0.01).minimize(self.cost)
 
 	def run_train_step(self, y_batch, a_batch, s_batch):
 		self.trainStep.run(feed_dict={self.yInput: y_batch, self.actionInput: a_batch, self.stateInput: s_batch})

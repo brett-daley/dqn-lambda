@@ -7,7 +7,6 @@ import itertools
 
 class Plotter:
 	def __init__(self, label_x ='', label_y='', title='', adjust_right=None):
-		font = {'family': 'normal', 'weight': 'bold', 'size': 1}
 		sns.set(font_scale=1.25)
 
 		self.plot_rank = 0
@@ -38,10 +37,6 @@ class Plotter:
 		self.add_shaded_err_plot(x=x_data, y_mean=y_mean_data, y_stdev=y_stdev_data, label=label)
 		return y_mean_data[-1], y_stdev_data[-1]
 
-	def update_legend(self, save_dir=None):
+	def update_legend(self):
 		plt.sca(self.ax)
 		plt.legend(handles=[hl for hl in self.hl], loc='center left', bbox_to_anchor=(1, 0.5), frameon=True)
-
-		if save_dir is not None:
-			self.fig.savefig(save_dir, bbox_inches='tight', pad_inches=0)
-			print 'Saved figure', save_dir

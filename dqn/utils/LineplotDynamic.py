@@ -5,7 +5,6 @@ from utils_general import Data2DTraj
 
 class LineplotDynamic:
 	def __init__(self, label_x, label_y, title, adjust_right=None):
-		font = {'family': 'normal', 'weight': 'bold', 'size': 1}
 		sns.set(font_scale=1.25)
 
 		self.fig, self.ax = plt.subplots(1, 1)
@@ -15,7 +14,7 @@ class LineplotDynamic:
 		self.ax.set_ylabel(label_y)
 		plt.title(title)
 		plt.ion()
-		
+
 		self.hl_dict = dict()
 		self.data_dict = dict()
 		self.filled_lines_dict = dict()
@@ -31,7 +30,7 @@ class LineplotDynamic:
 		self.filled_lines_dict[hl_name] = self.ax.fill_between(cur_data.x_traj, cur_data.y_lower_traj, cur_data.y_upper_traj, facecolor=cur_hl.get_color(), alpha=0.3)
 		cur_hl.set_ydata(cur_data.y_mean_traj)
 
-	def update(self, hl_name, x_new, y_new, y_stdev_new=0, label ='', init_at_origin=False):
+	def update(self, hl_name, x_new, y_new, y_stdev_new=0, label='', init_at_origin=False):
 		plt.sca(self.ax)
 
 		# New plot handle
@@ -43,7 +42,7 @@ class LineplotDynamic:
 
 			if init_at_origin:
 				self.append_data_and_plot(hl_name=hl_name, x_new=0, y_new=0, y_stdev_new=0)
-			plt.legend(handles=[hl for hl in self.hl_dict.values()], loc='center left', bbox_to_anchor=(1, 0.5), frameon=True)
+			plt.legend(handles=self.hl_dict.values(), loc='center left', bbox_to_anchor=(1, 0.5), frameon=True)
 
 		self.append_data_and_plot(hl_name=hl_name, x_new=x_new, y_new=y_new, y_stdev_new=y_stdev_new)
 

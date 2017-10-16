@@ -3,13 +3,15 @@ import numpy as np
 import random
 import os
 from LineplotDynamic import LineplotDynamic
-from utils_general import ReplayMemory
+from ReplayMemory import ReplayMemory
+import logging
 
 
 class DRQN:
 	def __init__(self, cfg_parser, n_actions, sess, agt):
 		self.cfg_parser = cfg_parser
 		self.sess = sess
+		self.logger = logging.getLogger()
 
 		# Initial phase where no training occurs. Allows population of replay memory before training.
 		self.n_pretrain_steps = int(self.cfg_parser.get('env', 'n_pretrain_steps'))
@@ -25,21 +27,14 @@ class DRQN:
 		self.target_q_update_freq = int(self.cfg_parser.get('dqn', 'target_q_update_freq'))
 		self.epsilon_test_time = float(self.cfg_parser.get('dqn', 'epsilon_test_time'))
 
-		# init some parameters
 		self.epsilon = self.epsilon_init
 		self.n_actions = n_actions
 
 		self.agt = agt
 		self.tracelength = int(self.cfg_parser.get('nn', 'agent_history_length')) if self.agt.nn.is_rnn else 1
 
-		# init replay memory (n_trajs_max is the number of trajectories! Each trajectory has many samples within it!)
-		self.n_trajs_max = int(self.cfg_parser.get('dqn', 'replay_memory_size'))
-		self.replay_memory = ReplayMemory(n_trajs_max=self.n_trajs_max, minibatch_size=self.minibatch_size)
-
-		# Init plotting
-		self.plot_qvalue_dqn = LineplotDynamic('Training Epoch', 'Q', '')
-		self.plot_init_qvalue_dqn = LineplotDynamic('Training Epoch', 'Value anticipated', '')
-		self.plot_value_dqn = LineplotDynamic('Training Epoch', 'Value actual', '')
+		self.replay_memory_capacity = int(self.cfg_parser.get('dqn', 'replay_memory_capacity'))
+		self.replay_memory = ReplayMemory(self.replay_memory_capacity, self.minibatch_size)
 
 	def reset_agts_rnn_states(self):
 		self.agt.reset_rnn_state()
@@ -47,36 +42,24 @@ class DRQN:
 	def init_agts_nnTs(self):
 		self.agt.init_nnT()
 
-	def update_Q_plot(self, timestep, hl_name='q_plot', label=None, s_batch_prespecified=None):
-		agt = self.agt
+	def init_plots(self):
+		self.plot_predicted_disc_return = LineplotDynamic(title='Predicted Discounted Episode Return', label_x='Timestep', label_y='Return')
+		self.plot_actual_disc_return = LineplotDynamic(title='Actual Discounted Episode Return', label_x='Timestep', label_y='Return')
+		self.plot_undisc_return = LineplotDynamic(title='Undiscounted Episode Return', label_x='Timestep', label_y='Return')
+		self.plot_mov_avg_undisc_return = LineplotDynamic(title='Undiscounted Episode Return (Moving Avg)', label_x='Timestep', label_y='Return')
 
-		if s_batch_prespecified is None:
-			# Since tracelength of 1 used, this ensures that truetracelengths = [1,....,1] and no masking required below
-			_, minibatch = self.replay_memory.sample_trace(tracelength=1)
-			s_batch = np.array([sample[0] for sample in minibatch])
-			minibatch_size_plot = self.minibatch_size
-		else:
-			s_batch = s_batch_prespecified
-			minibatch_size_plot = len(s_batch_prespecified)
+	def predict_disc_return(self, s_batch):
+		minibatch_size_plot = len(s_batch)
 
-		x = timestep
-		y = agt.nn.Qmax.eval(feed_dict={agt.nn.stateInput: s_batch,
-										agt.nn.tracelength: 1,
-										agt.nn.truetracelengths: [1]*minibatch_size_plot,
-										agt.nn.batch_size: minibatch_size_plot})
+		y = self.agt.nn.Qmax.eval(feed_dict={self.agt.nn.stateInput: s_batch,
+											 self.agt.nn.tracelength: 1,
+											 self.agt.nn.truetracelengths: [1]*minibatch_size_plot,
+											 self.agt.nn.batch_size: minibatch_size_plot})
 
-		y_mean = np.mean(y)
-		y_stdev = np.std(y)
-
-		if s_batch_prespecified is None:
-			self.plot_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
-		else:
-			self.plot_init_qvalue_dqn.update(hl_name=hl_name, label=label, x_new=x, y_new=y_mean, y_stdev_new=y_stdev)
-
-		return x, y_mean, y_stdev
+		return np.mean(y), np.std(y)
 
 	def get_processed_minibatch(self):
-		truetracelengths, minibatch = self.replay_memory.sample_trace(self.tracelength)
+		truetracelengths, minibatch = self.replay_memory.sample_traces(self.tracelength)
 
 		s_batch = np.array([sample[0] for sample in minibatch])
 		a_batch = minibatch[:,1]
@@ -154,7 +137,7 @@ class DRQN:
 		else:
 			phase = 'train (e-greedy, min epsilon reached)'
 
-		print 'ITER {} | PHASE {} | EPSILON {}'.format(timestep, phase, self.epsilon)
+		self.logger.info('ITER {} | PHASE {} | EPSILON {}'.format(timestep, phase, self.epsilon))
 
 	def dec_epsilon(self, timestep):
 		# Linearly decrease epsilon
