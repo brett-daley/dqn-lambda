@@ -1,5 +1,5 @@
 import sys
-sys.path.append('games/')
+sys.path.append('envs/')
 sys.path.append('nn_archs/')
 sys.path.append('utils/')
 import tensorflow as tf
@@ -107,7 +107,7 @@ def main():
 		logger.info('Creating new results directory: {}'.format(data_dir))
 
 		# TODO: don't hardcode config name
-		cfg_path = './games/config_Atari.ini'
+		cfg_path = './configs/Atari.ini'
 		cfg_parser = SafeConfigParser()
 		cfg_parser.read(cfg_path)
 
@@ -118,7 +118,7 @@ def main():
 		train(cfg_parser, data_dir, render=(not args.no_render))
 
 	else:
-		config_list = glob.glob(os.path.join(data_dir, 'config_*'))
+		config_list = glob.glob(os.path.join(data_dir, '*.ini'))
 		# Make sure only a single config file exists, otherwise something is wrong
 		assert len(config_list) == 1
 
