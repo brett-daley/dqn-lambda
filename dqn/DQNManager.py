@@ -105,7 +105,7 @@ class DQNManager:
 		mean_predicted_disc_return, stdev_predicted_disc_return = self.dqn.predict_disc_return(s_batch_initial)
 
 		if self.render:
-			self.plot_predicted_disc_return.update(hl_name=None, label=None, x_new=timestep, y_new=y_mean, y_stdev_new=y_stdev)
+			self.dqn.plot_predicted_disc_return.update(hl_name=None, label=None, x_new=timestep, y_new=mean_predicted_disc_return, y_stdev_new=stdev_predicted_disc_return)
 			self.dqn.plot_actual_disc_return.update(hl_name=None, label=None, x_new=timestep, y_new=mean_actual_disc_return, y_stdev_new=stdev_actual_disc_return)
 
 		return mean_predicted_disc_return, stdev_predicted_disc_return, mean_actual_disc_return, stdev_actual_disc_return

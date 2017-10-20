@@ -34,7 +34,7 @@ def load_plots(data_dir):
 	plots = [['Predicted Discounted Episode Return', 'predicted_disc_return'],
 			 ['Actual Discounted Episode Return', 'actual_disc_return'],
 			 ['Undiscounted Episode Return', 'undisc_return'],
-			 ['Undiscounted Episode Return (Moving Avg)', 'mov_avg_disc_return']]
+			 ['Undiscounted Episode Return (Moving Avg)', 'mov_avg_undisc_return']]
 
 	for plot_title, file_basename in plots:
 		data_file = os.path.join(data_dir, 'traj_' + file_basename + '.txt')
@@ -71,13 +71,13 @@ def train(cfg_parser, data_dir, render):
 	traj_predicted_disc_return.saveData(data_dir=os.path.join(data_dir, 'traj_predicted_disc_return.txt'))
 	traj_actual_disc_return.saveData(data_dir=os.path.join(data_dir, 'traj_actual_disc_return.txt'))
 	traj_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_undisc_return.txt'))
-	traj_mov_avg_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_mov_avg_disc_return.txt'))
+	traj_mov_avg_undisc_return.saveData(data_dir=os.path.join(data_dir, 'traj_mov_avg_undisc_return.txt'))
 
 	if render:
 		dqn_mgr.dqn.plot_predicted_disc_return.fig.savefig(os.path.join(data_dir, 'plot_predicted_disc_return.png'), bbox_inches='tight')
 		dqn_mgr.dqn.plot_actual_disc_return.fig.savefig(os.path.join(data_dir, 'plot_actual_disc_return.png'), bbox_inches='tight')
 		dqn_mgr.dqn.plot_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_undisc_return.png'), bbox_inches='tight')
-		dqn_mgr.dqn.plot_mov_avg_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_mov_avg_disc_return.png'), bbox_inches='tight')
+		dqn_mgr.dqn.plot_mov_avg_undisc_return.fig.savefig(os.path.join(data_dir, 'plot_mov_avg_undisc_return.png'), bbox_inches='tight')
 
 	saver = tf.train.Saver()
 	saver.save(sess, save_path=os.path.join(data_dir, 'model'))
