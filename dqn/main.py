@@ -18,6 +18,7 @@ import warnings; warnings.filterwarnings('ignore')
 
 def configure_logger(log_file):
 	logger = logging.getLogger()
+	[logger.removeHandler(h) for h in logger.handlers]
 	logger.setLevel(logging.DEBUG)
 
 	console = logging.StreamHandler()
