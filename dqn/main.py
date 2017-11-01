@@ -8,7 +8,7 @@ from Atari import Atari
 import os
 import glob
 import shutil
-from ConfigParser import SafeConfigParser
+from configparser import SafeConfigParser
 from plotting import Plotter
 import matplotlib.pyplot as plt
 import argparse
@@ -19,6 +19,9 @@ import warnings; warnings.filterwarnings('ignore')
 def configure_logger(log_file):
 	logger = logging.getLogger()
 	logger.setLevel(logging.DEBUG)
+
+	console = logging.StreamHandler()
+	logger.addHandler(console)
 
 	fh = logging.FileHandler(filename=log_file)
 	logger.addHandler(fh)
@@ -41,21 +44,21 @@ def load_plots(data_dir):
 		plot_file = os.path.join(data_dir, 'plot_' + file_basename + '.png')
 
 		if not os.path.exists(data_file):
-			print 'Could not find', data_file, '... skipping'
+			print('Could not find', data_file, '... skipping')
 		else:
 			p = Plotter(label_x='Timestep', label_y='Return', title=plot_title, adjust_right=0.73)
 			p.update_palette(n_colors=1)
 			p.add_data_to_plot('.', data_file, label=None)
 			p.update_legend()
-			print 'Successfully generated plot from', data_file
+			print('Successfully generated plot from', data_file)
 
 			if not os.path.exists(plot_file):
 				p.fig.savefig(plot_file, bbox_inches='tight', pad_inches=0)
-				print 'Saved plot in', plot_file
+				print('Saved plot in', plot_file)
 			else:
-				print plot_file, 'already exists'
+				print(plot_file, 'already exists')
 
-		print
+		print()
 
 	plt.show(block=True)
 
@@ -94,7 +97,7 @@ def main():
 	data_dir = os.path.join('results', args.job_name)
 
 	if args.overwrite and os.path.exists(data_dir):
-		print 'Deleting', data_dir
+		print('Deleting', data_dir)
 		shutil.rmtree(data_dir)
 
 	if not os.path.exists(data_dir):
@@ -125,9 +128,9 @@ def main():
 		# Load and print the config for the existing directory
 		cfg_path = config_list[0]
 		with open(cfg_path, 'r') as fin:
-			print '------ Successfully loaded', cfg_path
-			print fin.read()
-			print '------'
+			print('------ Successfully loaded', cfg_path)
+			print(fin.read())
+			print('------')
 
 		load_plots(data_dir)
 

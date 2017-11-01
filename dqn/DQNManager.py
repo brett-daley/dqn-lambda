@@ -46,7 +46,7 @@ class DQNManager:
 		i_training_epoch = 0
 		n_games_complete = 0
 
-		for i_train_step in xrange(n_max_steps):
+		for i_train_step in range(n_max_steps):
 			# Execute game and collect a single-timestep experience
 			obs, action, reward, next_obs, terminal, disc_return, undisc_return, mov_avg_undisc_return = self.update_game(game, timestep=i_train_step)
 			self.dqn.replay_memory.add(obs, action, reward, next_obs, terminal)
@@ -84,7 +84,7 @@ class DQNManager:
 		# Initial states and actions taken -- for plotting predicted value against actual
 		s_batch_initial = np.zeros([self.benchmark_for_n_episodes] + list(self.dqn.agt.dim_obs))
 
-		for i_episode in xrange(self.benchmark_for_n_episodes):
+		for i_episode in range(self.benchmark_for_n_episodes):
 			# Reset the game just in case anyone else was handling the game prior or forgot to reset RNN state. It should not hurt.
 			game.reset_game()
 			terminal = False

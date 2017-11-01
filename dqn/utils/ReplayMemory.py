@@ -43,7 +43,7 @@ class ReplayMemory:
         sampled_traces = []
         truetracelengths = []
 
-        for _ in xrange(self.minibatch_size):
+        for _ in range(self.minibatch_size):
             # Randomly sample a starting index for this trace
             start_idx = np.random.randint(1-tracelength, self.size)
             end_idx = start_idx + tracelength
