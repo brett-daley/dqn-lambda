@@ -1,12 +1,9 @@
-import seaborn as sns
 import matplotlib.pyplot as plt
 from utils_general import Data2DTraj
 
 
 class LineplotDynamic:
 	def __init__(self, label_x, label_y, title, adjust_right=None):
-		sns.set(font_scale=1.25)
-
 		self.fig, self.ax = plt.subplots(1, 1)
 		if adjust_right:
 			self.fig.subplots_adjust(right=adjust_right)

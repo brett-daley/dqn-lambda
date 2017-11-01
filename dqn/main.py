@@ -47,7 +47,6 @@ def load_plots(data_dir):
 			print('Could not find', data_file, '... skipping')
 		else:
 			p = Plotter(label_x='Timestep', label_y='Return', title=plot_title, adjust_right=0.73)
-			p.update_palette(n_colors=1)
 			p.add_data_to_plot('.', data_file, label=None)
 			p.update_legend()
 			print('Successfully generated plot from', data_file)
