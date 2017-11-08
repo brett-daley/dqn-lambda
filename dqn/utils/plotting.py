@@ -1,4 +1,3 @@
-import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -7,8 +6,6 @@ import itertools
 
 class Plotter:
 	def __init__(self, label_x ='', label_y='', title='', adjust_right=None):
-		sns.set(font_scale=1.25)
-
 		self.plot_rank = 0
 		self.fig, self.ax = plt.subplots(1, 1)
 		if adjust_right:
@@ -18,12 +15,9 @@ class Plotter:
 		plt.title(title)
 		self.hl = list()
 
-	def update_palette(self, n_colors):
-		self.palette = itertools.cycle(sns.hls_palette(n_colors, l=.4, s=.8))
-
 	def add_shaded_err_plot(self, x, y_mean, y_stdev=0, label=''):
 		plt.sca(self.ax)
-		hl_new, = plt.plot(x, y_mean, label=label, color=next(self.palette))
+		hl_new, = plt.plot(x, y_mean, label=label)
 		y_upper = y_mean - y_stdev
 		y_lower = y_mean + y_stdev
 

@@ -1,12 +1,9 @@
-import seaborn as sns
 import matplotlib.pyplot as plt
 from utils_general import Data2DTraj
 
 
 class LineplotDynamic:
 	def __init__(self, label_x, label_y, title, adjust_right=None):
-		sns.set(font_scale=1.25)
-
 		self.fig, self.ax = plt.subplots(1, 1)
 		if adjust_right:
 			self.fig.subplots_adjust(right=adjust_right)
@@ -42,7 +39,7 @@ class LineplotDynamic:
 
 			if init_at_origin:
 				self.append_data_and_plot(hl_name=hl_name, x_new=0, y_new=0, y_stdev_new=0)
-			plt.legend(handles=self.hl_dict.values(), loc='center left', bbox_to_anchor=(1, 0.5), frameon=True)
+			plt.legend(handles=list(self.hl_dict.values()), loc='center left', bbox_to_anchor=(1, 0.5), frameon=True)
 
 		self.append_data_and_plot(hl_name=hl_name, x_new=x_new, y_new=y_new, y_stdev_new=y_stdev_new)
 

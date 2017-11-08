@@ -1,7 +1,7 @@
 from Agent import Agent
 import numpy as np
 import gym
-from scipy.misc import imresize
+import cv2
 import logging
 
 
@@ -54,7 +54,7 @@ class Atari:
 
 	def preprocess(self, obs):
 		if len(obs.shape) > 1:
-			obs = imresize(obs, size=(84, 84))
+			obs = cv2.resize(obs, (84, 84))
 		return (2.0/255.0)*obs - 1
 
 	def store_obs(self, obs):
