@@ -86,7 +86,8 @@ def learn(env,
         input_shape = env.observation_space.shape
     else:
         img_h, img_w, img_c = env.observation_space.shape
-        input_shape = (img_h, img_w, frame_history_len * img_c)
+        #input_shape = (img_h, img_w, frame_history_len * img_c)
+        input_shape = (frame_history_len, img_h, img_w, img_c)
     num_actions = env.action_space.n
 
     # set up placeholders
@@ -104,6 +105,8 @@ def learn(env,
     # episode, only the current state reward contributes to the target, not the
     # next state Q-value (i.e. target is just rew_t_ph, not rew_t_ph + gamma * q_tp1)
     done_mask_ph          = tf.placeholder(tf.float32, [None])
+
+    batch_size_ph = tf.placeholder_with_default(1, shape=())
 
     # casting to float on GPU ensures lower data transfer times.
     obs_t_float   = tf.cast(obs_t_ph,   tf.float32) / 255.0
@@ -127,10 +130,10 @@ def learn(env,
     # Older versions of TensorFlow may require using "VARIABLES" instead of "GLOBAL_VARIABLES"
     ######
     
-    qvalues = q_func(obs_t_float, num_actions, scope='q_func', reuse=False)
+    qvalues = q_func(obs_t_float, num_actions, batch_size_ph, scope='q_func', reuse=False)
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
 
-    target_qvalues = q_func(obs_tp1_float, num_actions, scope='target_q_func', reuse=False)
+    target_qvalues = q_func(obs_tp1_float, num_actions, batch_size_ph, scope='target_q_func', reuse=False)
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_q_func')
 
     indices = tf.stack([tf.range(tf.size(act_t_ph)), act_t_ph], axis=-1)
@@ -293,6 +296,7 @@ def learn(env,
                 obs_tp1_ph: next_obs_batch,
                 done_mask_ph: done_mask,
                 learning_rate: optimizer_spec.lr_schedule.value(t),
+                batch_size_ph: batch_size,
             }
 
             session.run([train_fn], feed_dict=feed_dict)
