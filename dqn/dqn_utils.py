@@ -172,7 +172,7 @@ def get_wrapper_by_name(env, classname):
             raise ValueError("Couldn't find wrapper named %s"%classname)
 
 class ReplayBuffer(object):
-    def __init__(self, size, frame_history_len):
+    def __init__(self, size, frame_history_len, recurrent_mode):
         """This is a memory efficient implementation of the replay buffer.
 
         The sepecific memory optimizations use here are:
@@ -200,6 +200,7 @@ class ReplayBuffer(object):
         """
         self.size = size
         self.frame_history_len = frame_history_len
+        self.recurrent_mode = recurrent_mode
 
         self.next_idx      = 0
         self.num_in_buffer = 0
@@ -293,13 +294,19 @@ class ReplayBuffer(object):
             frames = [np.zeros_like(self.obs[0]) for _ in range(missing_context)]
             for idx in range(start_idx, end_idx):
                 frames.append(self.obs[idx % self.size])
-            #return np.concatenate(frames, 2)
-            return np.array(frames)
+
+            if not self.recurrent_mode:
+                return np.concatenate(frames, 2)
+            else:
+                return np.array(frames)
         else:
             # this optimization has potential to saves about 30% compute time \o/
             img_h, img_w = self.obs.shape[1], self.obs.shape[2]
-            #return self.obs[start_idx:end_idx].transpose(1, 2, 0, 3).reshape(img_h, img_w, -1)
-            return self.obs[start_idx:end_idx]
+
+            if not self.recurrent_mode:
+                return self.obs[start_idx:end_idx].transpose(1, 2, 0, 3).reshape(img_h, img_w, -1)
+            else:
+                return self.obs[start_idx:end_idx]
 
     def store_frame(self, frame):
         """Store a single frame in the buffer at the next available index, overwriting

@@ -86,8 +86,11 @@ def learn(env,
         input_shape = env.observation_space.shape
     else:
         img_h, img_w, img_c = env.observation_space.shape
-        #input_shape = (img_h, img_w, frame_history_len * img_c)
-        input_shape = (frame_history_len, img_h, img_w, img_c)
+
+        if not q_func.is_recurrent():
+            input_shape = (img_h, img_w, frame_history_len * img_c)
+        else:
+            input_shape = (frame_history_len, img_h, img_w, img_c)
     num_actions = env.action_space.n
 
     # set up placeholders
@@ -163,7 +166,7 @@ def learn(env,
     update_target_fn = tf.group(*update_target_fn)
 
     # construct the replay buffer
-    replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len)
+    replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, recurrent_mode=q_func.is_recurrent())
 
     ###############
     # RUN ENV     #
