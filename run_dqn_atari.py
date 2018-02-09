@@ -36,6 +36,7 @@ def main():
         replay_buffer_size=1000000,
         batch_size=32,
         gamma=0.99,
+        Lambda=0.0,
         learning_starts=50000,
         learning_freq=4,
         history_len=4,

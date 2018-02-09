@@ -18,6 +18,7 @@ def learn(env,
           replay_buffer_size=1000000,
           batch_size=32,
           gamma=0.99,
+          Lambda=0.0,
           learning_starts=50000,
           learning_freq=4,
           history_len=4,
@@ -45,24 +46,16 @@ def learn(env,
     obs_t_ph      = tf.placeholder(obs_dtype,  [None] + list(input_shape))
     act_t_ph      = tf.placeholder(tf.int32,   [None])
     rew_t_ph      = tf.placeholder(tf.float32, [None])
-    obs_tp1_ph    = tf.placeholder(obs_dtype,  [None] + list(input_shape))
-    done_mask_ph  = tf.placeholder(tf.float32, [None])
 
     qvalues, rnn_state_tf = q_func(obs_t_ph, n_actions, scope='q_func')
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
 
-    target_qvalues, _ = q_func(obs_tp1_ph, n_actions, scope='target_q_func')
-    target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_q_func')
-
     action_indices = tf.stack([tf.range(tf.size(act_t_ph)), act_t_ph], axis=-1)
     onpolicy_qvalues = tf.gather_nd(qvalues, action_indices)
 
-    targets = tf.reduce_max(target_qvalues, axis=-1)
+    max_qvalues = tf.reduce_max(qvalues, axis=-1)
 
-    done_td_error = rew_t_ph - onpolicy_qvalues
-    not_done_td_error = done_td_error + (gamma * targets)
-
-    td_error = tf.where(tf.cast(done_mask_ph, tf.bool), x=done_td_error, y=not_done_td_error)
+    td_error = rew_t_ph - onpolicy_qvalues
     total_error = tf.reduce_mean(tf.square(td_error))
 
     # compute and clip gradients
@@ -71,15 +64,14 @@ def learn(env,
         grads_and_vars = [(tf.clip_by_value(g, -grad_clip, +grad_clip), v) for g, v in grads_and_vars]
     train_op = optimizer.apply_gradients(grads_and_vars)
 
-    # update_target_fn will be called periodically to copy Q network to target Q network
-    update_target_fn = []
-    for var, var_target in zip(sorted(q_func_vars,        key=lambda v: v.name),
-                               sorted(target_q_func_vars, key=lambda v: v.name)):
-        update_target_fn.append(var_target.assign(var))
-    update_target_fn = tf.group(*update_target_fn)
-
     # construct the replay buffer
-    replay_buffer = ReplayBuffer(replay_buffer_size, history_len, use_float)
+    replay_buffer = ReplayBuffer(
+                        replay_buffer_size,
+                        history_len,
+                        gamma,
+                        Lambda,
+                        refresh_func=lambda obs: session.run(max_qvalues, feed_dict={obs_t_ph: obs})
+                    )
 
     # initialize variables
     session.run(tf.global_variables_initializer())
@@ -141,7 +133,7 @@ def learn(env,
             break
 
         if t % target_update_freq == 0:
-            session.run(update_target_fn)
+            replay_buffer.refresh()
 
         idx = replay_buffer.store_frame(obs)
         obs = replay_buffer.encode_recent_observation()
@@ -150,19 +142,17 @@ def learn(env,
         action, rnn_state = epsilon_greedy(obs, rnn_state, epsilon)
 
         obs, reward, done, _ = env.step(action)
-        replay_buffer.store_effect(idx, action, reward, done)
+        replay_buffer.store_effect(action, reward, done)
 
         if done:
             obs = env.reset()
             rnn_state = None
 
         if (t >= learning_starts and t % learning_freq == 0):
-            obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
+            obs_batch, act_batch, rew_batch = replay_buffer.sample(batch_size)
 
             session.run(train_op, feed_dict= {
                 obs_t_ph: obs_batch,
                 act_t_ph: act_batch,
                 rew_t_ph: rew_batch,
-                obs_tp1_ph: next_obs_batch,
-                done_mask_ph: done_mask,
             })
