@@ -1,5 +1,4 @@
-import sys
-import gym.spaces
+import gym
 import itertools
 import numpy as np
 import random
@@ -7,6 +6,7 @@ import tensorflow                as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
 from dqn_utils import *
+from atari_wrappers import *
 
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
 
@@ -15,7 +15,7 @@ def learn(env,
           optimizer_spec,
           session,
           exploration=LinearSchedule(1000000, 0.1),
-          stopping_criterion=None,
+          max_timesteps=50000000,
           replay_buffer_size=1000000,
           batch_size=32,
           gamma=0.99,
@@ -168,20 +168,48 @@ def learn(env,
     # construct the replay buffer
     replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, recurrent_mode=q_func.is_recurrent())
 
+    session.run(tf.global_variables_initializer())
+
+    def epsilon_greedy(obs, epsilon):
+        if random.random() < epsilon:
+            action = env.action_space.sample()
+        else:
+            q = session.run(qvalues, feed_dict={obs_t_ph: obs[None]})
+            action = np.argmax(q)
+
+        return action
+
     ###############
     # RUN ENV     #
     ###############
-    model_initialized = False
-    num_param_updates = 0
-    mean_episode_reward      = -float('nan')
-    best_mean_episode_reward = -float('inf')
-    last_obs = env.reset()
-    LOG_EVERY_N_STEPS = 10000
+    best_mean_reward = -float('inf')
+    obs = env.reset()
+    n_epochs = 0
+    LOG_EVERY_N_STEPS = 250000
 
     for t in itertools.count():
+        if t % LOG_EVERY_N_STEPS == 0:
+            print('Epoch', n_epochs)
+            print('Timestep', t)
+            print('Episodes', len(get_wrapper_by_name(env, 'Monitor').get_episode_rewards()))
+            print('Exploration', exploration.value(t))
+            print('Learning rate', optimizer_spec.lr_schedule.value(t))
+
+            mean_reward = benchmark(env.spec.id, replay_buffer, epsilon_greedy, n_episodes=30)
+            best_mean_reward = max(mean_reward, best_mean_reward)
+
+            print('Mean reward', mean_reward)
+            print('Best mean reward', best_mean_reward)
+            print(flush=True)
+
+            n_epochs += 1
+
         ### 1. Check stopping criterion
-        if stopping_criterion is not None and stopping_criterion(env, t):
+        if t >= max_timesteps:
             break
+
+        if t % target_update_freq == 0:
+            session.run(update_target_fn)
 
         ### 2. Step the env and store the transition
         # At this point, "last_obs" contains the latest observation that was
@@ -215,25 +243,17 @@ def learn(env,
 
         #####
         
-        idx = replay_buffer.store_frame(last_obs)
-        last_obs = replay_buffer.encode_recent_observation()
+        idx = replay_buffer.store_frame(obs)
+        obs = replay_buffer.encode_recent_observation()
 
         epsilon = exploration.value(t)
-
-        if random.random() < epsilon or not model_initialized:
-            action = env.action_space.sample()
-        else:
-            last_obs = np.expand_dims(last_obs, 0)
-            q, = session.run([qvalues], feed_dict={obs_t_ph: last_obs})
-            action = np.argmax(q)
+        action = epsilon_greedy(obs, epsilon)
 
         obs, reward, done, _ = env.step(action)
         replay_buffer.store_effect(idx, action, reward, done)
 
         if done:
             obs = env.reset()
-
-        last_obs = obs
 
         #####
 
@@ -285,13 +305,6 @@ def learn(env,
             
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
-            if not model_initialized:
-                initialize_interdependent_variables(session, tf.global_variables(), {
-                    obs_t_ph: obs_batch,
-                    obs_tp1_ph: next_obs_batch,
-                })
-                model_initialized = True
-
             feed_dict = {
                 obs_t_ph: obs_batch,
                 act_t_ph: act_batch,
@@ -302,24 +315,28 @@ def learn(env,
                 batch_size_ph: batch_size,
             }
 
-            session.run([train_fn], feed_dict=feed_dict)
-
-            if t % target_update_freq == 0:
-                session.run(update_target_fn)
+            session.run(train_fn, feed_dict=feed_dict)
 
             #####
 
-        ### 4. Log progress
-        episode_rewards = get_wrapper_by_name(env, "Monitor").get_episode_rewards()
-        if len(episode_rewards) > 0:
-            mean_episode_reward = np.mean(episode_rewards[-100:])
-        if len(episode_rewards) > 100:
-            best_mean_episode_reward = max(best_mean_episode_reward, mean_episode_reward)
-        if t % LOG_EVERY_N_STEPS == 0 and model_initialized:
-            print("Timestep %d" % (t,))
-            print("mean reward (100 episodes) %f" % mean_episode_reward)
-            print("best mean reward %f" % best_mean_episode_reward)
-            print("episodes %d" % len(episode_rewards))
-            print("exploration %f" % exploration.value(t))
-            print("learning_rate %f" % optimizer_spec.lr_schedule.value(t))
-            sys.stdout.flush()
+def benchmark(env_id, replay_buffer, epsilon_greedy, n_episodes):
+    env = wrap_deepmind(gym.make(env_id))
+
+    total_reward = 0.
+
+    for i in range(n_episodes):
+        obs = env.reset()
+        done = False
+
+        while not done:
+            idx = replay_buffer.store_frame(obs)
+            obs = replay_buffer.encode_recent_observation()
+
+            action = epsilon_greedy(obs, epsilon=0.05)
+
+            obs, reward, done, _ = env.step(action)
+            replay_buffer.store_effect(idx, action, reward, done)
+
+            total_reward += reward
+
+    return (total_reward / n_episodes)

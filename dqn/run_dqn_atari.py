@@ -79,23 +79,17 @@ def atari_learn(env,
     # This is just a rough estimate
     num_iterations = float(num_timesteps) / 4.0
 
-    lr_multiplier = 1.0
     lr_schedule = PiecewiseSchedule([
-                                         (0,                   1e-4 * lr_multiplier),
-                                         (num_iterations / 10, 1e-4 * lr_multiplier),
-                                         (num_iterations / 2,  5e-5 * lr_multiplier),
+                                         (0,                   1e-4),
+                                         (num_iterations / 10, 1e-4),
+                                         (num_iterations / 2,  5e-5),
                                     ],
-                                    outside_value=5e-5 * lr_multiplier)
+                                    outside_value=5e-5)
     optimizer = dqn.OptimizerSpec(
         constructor=tf.train.AdamOptimizer,
         kwargs=dict(epsilon=1e-4),
         lr_schedule=lr_schedule
     )
-
-    def stopping_criterion(env, t):
-        # notice that here t is the number of steps of the wrapped env,
-        # which is different from the number of steps in the underlying env
-        return get_wrapper_by_name(env, "Monitor").get_total_steps() >= num_timesteps
 
     exploration_schedule = PiecewiseSchedule(
         [
@@ -107,11 +101,11 @@ def atari_learn(env,
 
     dqn.learn(
         env,
-        q_func=atari_recurrent(),
+        q_func=atari_model(),
         optimizer_spec=optimizer,
         session=session,
         exploration=exploration_schedule,
-        stopping_criterion=stopping_criterion,
+        max_timesteps=num_timesteps,
         replay_buffer_size=1000000,
         batch_size=32,
         gamma=0.99,
@@ -155,7 +149,7 @@ def get_env(task, seed):
     set_global_seeds(seed)
     env.seed(seed)
 
-    expt_dir = '/tmp/hw3_vid_dir2/'
+    expt_dir = 'videos/'
     env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
     env = wrap_deepmind(env)
 
@@ -163,7 +157,7 @@ def get_env(task, seed):
 
 def main():
     # Get Atari games.
-    benchmark = gym.benchmark_spec('Atari40M')
+    benchmark = gym.benchmark_spec('Atari200M')
 
     # Change the index to select a different game.
     task = benchmark.tasks[3]
