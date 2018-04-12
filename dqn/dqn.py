@@ -185,7 +185,7 @@ def learn(env,
     best_mean_reward = -float('inf')
     obs = env.reset()
     n_epochs = 0
-    LOG_EVERY_N_STEPS = 250000
+    LOG_EVERY_N_STEPS = 25000
 
     for t in itertools.count():
         if t % LOG_EVERY_N_STEPS == 0:

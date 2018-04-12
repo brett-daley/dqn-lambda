@@ -75,14 +75,12 @@ class atari_model:
 
 def atari_learn(env,
                 session,
-                num_timesteps):
-    # This is just a rough estimate
-    num_iterations = float(num_timesteps) / 4.0
+                n_timesteps):
 
     lr_schedule = PiecewiseSchedule([
                                          (0,                   1e-4),
-                                         (num_iterations / 10, 1e-4),
-                                         (num_iterations / 2,  5e-5),
+                                         (n_timesteps / 10, 1e-4),
+                                         (n_timesteps / 2,  5e-5),
                                     ],
                                     outside_value=5e-5)
     optimizer = dqn.OptimizerSpec(
@@ -95,7 +93,7 @@ def atari_learn(env,
         [
             (0, 1.0),
             (1e6, 0.1),
-            (num_iterations / 2, 0.01),
+            (n_timesteps / 2, 0.01),
         ], outside_value=0.01
     )
 
@@ -105,7 +103,7 @@ def atari_learn(env,
         optimizer_spec=optimizer,
         session=session,
         exploration=exploration_schedule,
-        max_timesteps=num_timesteps,
+        max_timesteps=n_timesteps,
         replay_buffer_size=1000000,
         batch_size=32,
         gamma=0.99,
@@ -149,8 +147,7 @@ def get_env(task, seed):
     set_global_seeds(seed)
     env.seed(seed)
 
-    expt_dir = 'videos/'
-    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
+    env = wrappers.Monitor(env, 'videos/', force=True)
     env = wrap_deepmind(env)
 
     return env
@@ -166,7 +163,7 @@ def main():
     seed = 0 # Use a seed of zero (you may want to randomize the seed!)
     env = get_env(task, seed)
     session = get_session()
-    atari_learn(env, session, num_timesteps=task.max_timesteps)
+    atari_learn(env, session, n_timesteps=5000000)
 
 if __name__ == "__main__":
     main()
