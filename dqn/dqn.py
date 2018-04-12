@@ -5,6 +5,7 @@ import random
 import tensorflow                as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
+from copy import deepcopy
 from dqn_utils import *
 from atari_wrappers import *
 
@@ -168,6 +169,12 @@ def learn(env,
     # construct the replay buffer
     replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, recurrent_mode=q_func.is_recurrent())
 
+    # for benchmarking
+    bm_env = deepcopy(env)
+    get_wrapper_by_name(bm_env, 'Monitor').video_callable = lambda e: False
+    bm_replay_buffer = deepcopy(replay_buffer)
+
+    # initialize variables
     session.run(tf.global_variables_initializer())
 
     def epsilon_greedy(obs, epsilon):
@@ -178,6 +185,24 @@ def learn(env,
             action = np.argmax(q)
 
         return action
+
+    def benchmark(n_episodes):
+        for i in range(n_episodes):
+            obs = bm_env.reset()
+            done = False
+
+            while not done:
+                idx = bm_replay_buffer.store_frame(obs)
+                obs = bm_replay_buffer.encode_recent_observation()
+
+                action = epsilon_greedy(obs, epsilon=0.05)
+
+                obs, reward, done, _ = bm_env.step(action)
+                bm_replay_buffer.store_effect(idx, action, reward, done)
+
+        rewards = get_wrapper_by_name(bm_env, 'Monitor').get_episode_rewards()[-n_episodes:]
+
+        return np.mean(rewards), np.std(rewards)
 
     ###############
     # RUN ENV     #
@@ -195,11 +220,12 @@ def learn(env,
             print('Exploration', exploration.value(t))
             print('Learning rate', optimizer_spec.lr_schedule.value(t))
 
-            mean_reward = benchmark(env.spec.id, replay_buffer, epsilon_greedy, n_episodes=30)
+            mean_reward, std_reward = benchmark(n_episodes=30)
             best_mean_reward = max(mean_reward, best_mean_reward)
 
             print('Mean reward', mean_reward)
             print('Best mean reward', best_mean_reward)
+            print('Standard dev', std_reward)
             print(flush=True)
 
             n_epochs += 1
@@ -318,25 +344,3 @@ def learn(env,
             session.run(train_fn, feed_dict=feed_dict)
 
             #####
-
-def benchmark(env_id, replay_buffer, epsilon_greedy, n_episodes):
-    env = wrap_deepmind(gym.make(env_id))
-
-    total_reward = 0.
-
-    for i in range(n_episodes):
-        obs = env.reset()
-        done = False
-
-        while not done:
-            idx = replay_buffer.store_frame(obs)
-            obs = replay_buffer.encode_recent_observation()
-
-            action = epsilon_greedy(obs, epsilon=0.05)
-
-            obs, reward, done, _ = env.step(action)
-            replay_buffer.store_effect(idx, action, reward, done)
-
-            total_reward += reward
-
-    return (total_reward / n_episodes)
