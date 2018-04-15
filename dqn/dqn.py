@@ -5,7 +5,6 @@ import random
 import tensorflow                as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
-from copy import deepcopy
 from dqn_utils import *
 from atari_wrappers import *
 
@@ -170,9 +169,12 @@ def learn(env,
     replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, recurrent_mode=q_func.is_recurrent())
 
     # for benchmarking
-    bm_env = deepcopy(env)
-    get_wrapper_by_name(bm_env, 'Monitor').video_callable = lambda e: False
-    bm_replay_buffer = deepcopy(replay_buffer)
+    bm_replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, recurrent_mode=q_func.is_recurrent())
+
+    bm_env = gym.make(env.spec.id)
+    bm_env = gym.wrappers.Monitor(bm_env, 'videos/', force=True, video_callable=lambda e: False)
+    bm_env = wrap_deepmind(bm_env)
+    bm_env.seed(0)
 
     # initialize variables
     session.run(tf.global_variables_initializer())
