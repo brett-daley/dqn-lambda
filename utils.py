@@ -223,7 +223,6 @@ class Episode(object):
 
         self.obs    = []
         self.action = []
-        self.qvalue = []
         self.reward = []
         self.lambda_return = None
 
@@ -243,24 +242,15 @@ class Episode(object):
 
         self.obs = np.concatenate([obs[None] for obs in self.obs], 0)
         self.action = np.array(self.action)
-        self.qvalue = np.empty_like(self.action)
         self.reward = np.array(self.reward)
-        self.lambda_return = np.empty_like(self.reward)
 
-        self._calc_reward_sequence()
         self.refresh()
 
-    def _calc_reward_sequence(self):
-        for i in reversed(range(self.length-1)):
-                self.reward[i] += (self.Lambda * self.discount) * self.reward[i+1]
-
-    def _calc_lambda_return(self):
-        self.qvalue = np.pad(self.qvalue[1:], pad_width=(0,1), mode='constant')
-
-        for i in reversed(range(self.length-1)):
-            self.qvalue[i] += (self.Lambda * self.discount) * self.qvalue[i+1]
-
-        self.lambda_return = self.reward + ((1-self.Lambda) * self.discount * self.qvalue)
+    def _calc_lambda_return(self, qvalues):
+        lambda_return = self.reward + (self.discount * qvalues)
+        for i in reversed(range(self.length - 1)):
+            lambda_return[i] += (self.discount * self.Lambda) * (lambda_return[i+1] - qvalues[i])
+        return lambda_return
 
     def sample(self):
         i = random.randrange(self.length)
@@ -268,8 +258,11 @@ class Episode(object):
 
     def refresh(self):
         obs = np.array([self._encode_observation(i) for i in range(self.length)])
-        self.qvalue = self.refresh_func(obs)
-        self._calc_lambda_return()
+
+        qvalues = self.refresh_func(obs)
+        qvalues = np.pad(qvalues[1:], pad_width=(0,1), mode='constant')
+
+        self.lambda_return = self._calc_lambda_return(qvalues)
 
     def _encode_observation(self, idx):
         end = (idx % self.length) + 1 # make noninclusive
