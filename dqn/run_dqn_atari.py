@@ -16,49 +16,42 @@ class atari_recurrent:
     def is_recurrent(self):
         return True
 
-    def __call__(self, img_in, num_actions, batch_size, scope, reuse=False):
-        # as described in https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf
-        print(img_in.shape)
-        img_in = tf.reshape(img_in, [-1, 84, 84, 1])
+    def __call__(self, img_in, num_actions, scope, reuse=False):
+        out = tf.unstack(img_in, axis=1)
+        out = tf.concat(out, axis=0)
+        print('Recurrent', img_in.shape)
 
         with tf.variable_scope(scope, reuse=reuse):
-            out = img_in
-            print(out.shape)
-
             with tf.variable_scope("convnet"):
                 # original architecture
                 out = layers.convolution2d(out, num_outputs=32, kernel_size=8, stride=4, activation_fn=tf.nn.relu)
                 out = layers.convolution2d(out, num_outputs=64, kernel_size=4, stride=2, activation_fn=tf.nn.relu)
                 out = layers.convolution2d(out, num_outputs=64, kernel_size=3, stride=1, activation_fn=tf.nn.relu)
 
-            print(out.shape)
-            out = tf.reshape(out, [batch_size, 4, tf.size(out[0])])
-            print(out.shape)
+            out = tf.reshape(out, [-1, tf.shape(img_in)[1], tf.size(out[0])])
 
             with tf.variable_scope("action_value"):
                 cell = tf.contrib.rnn.BasicLSTMCell(num_units=512)
-                init_state = cell.zero_state(batch_size, tf.float32)
+                init_state = cell.zero_state(tf.shape(img_in)[0], tf.float32)
+
                 out, state = tf.nn.dynamic_rnn(cell, inputs=out, initial_state=init_state, dtype=tf.float32)
 
                 out = out[:, -1]
-                print(out.shape)
-
                 out = layers.fully_connected(out, num_outputs=512,         activation_fn=tf.nn.relu)
                 out = layers.fully_connected(out, num_outputs=num_actions, activation_fn=None)
 
             return out
 
-class atari_model:
+class atari_feedforward:
     def is_recurrent(self):
         return False
 
-    def __call__(self, img_in, num_actions, batch_size, scope, reuse=False):
-        # as described in https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf
-        print(img_in.shape)
+    def __call__(self, img_in, num_actions, scope, reuse=False):
+        out = tf.unstack(img_in, axis=1)
+        out = tf.concat(out, axis=-1)
+        print('Feedforward', out.shape)
 
         with tf.variable_scope(scope, reuse=reuse):
-            out = img_in
-
             with tf.variable_scope("convnet"):
                 # original architecture
                 out = layers.convolution2d(out, num_outputs=32, kernel_size=8, stride=4, activation_fn=tf.nn.relu)
@@ -99,7 +92,7 @@ def atari_learn(env,
 
     dqn.learn(
         env,
-        q_func=atari_model(),
+        q_func=atari_feedforward(),
         optimizer_spec=optimizer,
         session=session,
         exploration=exploration_schedule,
