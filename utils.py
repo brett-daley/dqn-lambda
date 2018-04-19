@@ -325,8 +325,8 @@ class ReplayBuffer(object):
     def _move_episode_to_buffer(self):
         self.current_episode.finish()
 
-        if len(self.episodes) == self.size:
-                self.episodes.pop(0)
+        while sum([e.length for e in self.episodes]) > self.size:
+            self.episodes.pop(0)
 
         self.episodes.append(self.current_episode)
         self.current_episode = self._new_episode()
