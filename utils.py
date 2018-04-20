@@ -301,7 +301,15 @@ class ReplayBuffer(object):
 
     def sample(self, batch_size):
         assert self.can_sample()
-        idxes = [random.randrange(len(self.episodes)) for _ in range(batch_size)]
+
+        lengths = np.array([e.length for e in self.episodes])
+        bias_correction = lengths / np.sum(lengths)
+
+        idxes = np.random.choice(
+            a=np.arange(len(self.episodes)),
+            size=batch_size,
+            p=bias_correction,
+        )
         return self._encode_sample(idxes)
 
     def encode_recent_observation(self):
