@@ -31,16 +31,15 @@ class atari_recurrent:
             out = tf.reshape(out, [-1, tf.shape(img_in)[1], tf.size(out[0])])
 
             with tf.variable_scope("action_value"):
-                cell = tf.contrib.rnn.BasicLSTMCell(num_units=512)
-                init_state = cell.zero_state(tf.shape(img_in)[0], tf.float32)
-
-                out, state = tf.nn.dynamic_rnn(cell, inputs=out, initial_state=init_state, dtype=tf.float32)
+                self.cell = tf.contrib.rnn.BasicLSTMCell(num_units=512)
+                self.rnn_state = self.cell.zero_state(tf.shape(img_in)[0], tf.float32)
+                out, new_rnn_state = tf.nn.dynamic_rnn(self.cell, inputs=out, initial_state=self.rnn_state, dtype=tf.float32)
 
                 out = out[:, -1]
                 out = layers.fully_connected(out, num_outputs=512,         activation_fn=tf.nn.relu)
                 out = layers.fully_connected(out, num_outputs=num_actions, activation_fn=None)
 
-            return out
+            return out, new_rnn_state
 
 class atari_feedforward:
     def is_recurrent(self):
@@ -64,7 +63,7 @@ class atari_feedforward:
                 out = layers.fully_connected(out, num_outputs=512,         activation_fn=tf.nn.relu)
                 out = layers.fully_connected(out, num_outputs=num_actions, activation_fn=None)
 
-            return out
+            return out, None
 
 def atari_learn(env,
                 session,

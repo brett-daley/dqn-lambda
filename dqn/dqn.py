@@ -128,10 +128,10 @@ def learn(env,
     # Older versions of TensorFlow may require using "VARIABLES" instead of "GLOBAL_VARIABLES"
     ######
     
-    qvalues = q_func(obs_t_float, num_actions, scope='q_func', reuse=False)
+    qvalues, rnn_state_tf = q_func(obs_t_float, num_actions, scope='q_func', reuse=False)
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
 
-    target_qvalues = q_func(obs_tp1_float, num_actions, scope='target_q_func', reuse=False)
+    target_qvalues, _ = q_func(obs_tp1_float, num_actions, scope='target_q_func', reuse=False)
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_q_func')
 
     indices = tf.stack([tf.range(tf.size(act_t_ph)), act_t_ph], axis=-1)
@@ -174,25 +174,36 @@ def learn(env,
     # initialize variables
     session.run(tf.global_variables_initializer())
 
-    def epsilon_greedy(obs, epsilon):
+    def epsilon_greedy(obs, rnn_state, epsilon):
+        if q_func.is_recurrent():
+            feed_dict = {obs_t_ph: obs[None]}
+
+            if rnn_state is not None:
+                feed_dict[q_func.rnn_state] = rnn_state
+
+            q, rnn_state = session.run([qvalues, rnn_state_tf], feed_dict)
+
+        else:
+            q = session.run(qvalues, feed_dict={obs_t_ph: obs[None]})
+
         if random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            q = session.run(qvalues, feed_dict={obs_t_ph: obs[None]})
             action = np.argmax(q)
 
-        return action
+        return action, rnn_state
 
     def benchmark(n_episodes):
         for i in range(n_episodes):
             obs = bm_env.reset()
+            rnn_state = None
             done = False
 
             while not done:
                 idx = bm_replay_buffer.store_frame(obs)
                 obs = bm_replay_buffer.encode_recent_observation()
 
-                action = epsilon_greedy(obs, epsilon=0.05)
+                action, rnn_state = epsilon_greedy(obs, rnn_state, epsilon=0.05)
 
                 obs, reward, done, _ = bm_env.step(action)
                 bm_replay_buffer.store_effect(idx, action, reward, done)
@@ -206,6 +217,7 @@ def learn(env,
     ###############
     best_mean_reward = -float('inf')
     obs = env.reset()
+    rnn_state = None
     n_epochs = 0
     LOG_EVERY_N_STEPS = 25000
 
@@ -270,13 +282,14 @@ def learn(env,
         obs = replay_buffer.encode_recent_observation()
 
         epsilon = exploration.value(t)
-        action = epsilon_greedy(obs, epsilon)
+        action, rnn_state = epsilon_greedy(obs, rnn_state, epsilon)
 
         obs, reward, done, _ = env.step(action)
         replay_buffer.store_effect(idx, action, reward, done)
 
         if done:
             obs = env.reset()
+            rnn_state = None
 
         #####
 
