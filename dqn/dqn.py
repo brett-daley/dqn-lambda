@@ -5,6 +5,7 @@ import random
 import tensorflow                as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
+import time
 from dqn_utils import *
 from atari_wrappers import *
 
@@ -220,11 +221,13 @@ def learn(env,
     rnn_state = None
     n_epochs = 0
     LOG_EVERY_N_STEPS = 25000
+    start_time = time.time()
 
     for t in itertools.count():
         if t % LOG_EVERY_N_STEPS == 0:
             print('Epoch', n_epochs)
             print('Timestep', t)
+            print('Realtime {:.3f}'.format(time.time() - start_time))
             print('Episodes', len(get_wrapper_by_name(env, 'Monitor').get_episode_rewards()))
             print('Exploration', exploration.value(t))
             print('Learning rate', optimizer_spec.lr_schedule.value(t))
