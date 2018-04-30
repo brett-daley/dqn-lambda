@@ -17,8 +17,7 @@ class atari_recurrent:
         return True
 
     def __call__(self, img_in, num_actions, scope, reuse=False):
-        out = tf.unstack(img_in, axis=1)
-        out = tf.concat(out, axis=0)
+        out = tf.reshape(img_in, [-1, img_in.shape[2], img_in.shape[3], img_in.shape[4]])
         print('Recurrent', img_in.shape)
 
         with tf.variable_scope(scope, reuse=reuse):
@@ -28,7 +27,7 @@ class atari_recurrent:
                 out = layers.convolution2d(out, num_outputs=64, kernel_size=4, stride=2, activation_fn=tf.nn.relu)
                 out = layers.convolution2d(out, num_outputs=64, kernel_size=3, stride=1, activation_fn=tf.nn.relu)
 
-            out = tf.reshape(out, [-1, tf.shape(img_in)[1], tf.size(out[0])])
+            out = tf.reshape(out, [tf.shape(img_in)[0], img_in.shape[1], tf.size(out[0])])
 
             with tf.variable_scope("action_value"):
                 self.cell = tf.contrib.rnn.BasicLSTMCell(num_units=512)
