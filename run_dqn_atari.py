@@ -10,62 +10,10 @@ import tensorflow.contrib.layers as layers
 import dqn
 from dqn_utils import *
 from atari_wrappers import *
+import q_functions
 
 
-class atari_recurrent:
-    def is_recurrent(self):
-        return True
-
-    def __call__(self, img_in, num_actions, scope, reuse=False):
-        out = tf.reshape(img_in, [-1, img_in.shape[2], img_in.shape[3], img_in.shape[4]])
-        print('Recurrent', img_in.shape)
-
-        with tf.variable_scope(scope, reuse=reuse):
-            with tf.variable_scope("convnet"):
-                out = layers.convolution2d(out, num_outputs=32, kernel_size=8, stride=4, activation_fn=tf.nn.relu)
-                out = layers.convolution2d(out, num_outputs=64, kernel_size=4, stride=2, activation_fn=tf.nn.relu)
-                out = layers.convolution2d(out, num_outputs=64, kernel_size=3, stride=1, activation_fn=tf.nn.relu)
-
-            out = tf.reshape(out, [tf.shape(img_in)[0], img_in.shape[1], tf.size(out[0])])
-
-            with tf.variable_scope("action_value"):
-                with tf.variable_scope('lstm'):
-                    cell = tf.contrib.rnn.BasicLSTMCell(num_units=512)
-                    self.rnn_state = cell.zero_state(tf.shape(img_in)[0], tf.float32)
-                    out, new_rnn_state = tf.nn.dynamic_rnn(cell, inputs=out, initial_state=self.rnn_state, dtype=tf.float32)
-
-                out = out[:, -1]
-                out = layers.fully_connected(out, num_outputs=num_actions, activation_fn=None)
-
-        return out, new_rnn_state
-
-class atari_feedforward:
-    def is_recurrent(self):
-        return False
-
-    def __call__(self, img_in, num_actions, scope, reuse=False):
-        out = tf.unstack(img_in, axis=1)
-        out = tf.concat(out, axis=-1)
-        print('Feedforward', out.shape)
-
-        with tf.variable_scope(scope, reuse=reuse):
-            with tf.variable_scope("convnet"):
-                out = layers.convolution2d(out, num_outputs=32, kernel_size=8, stride=4, activation_fn=tf.nn.relu)
-                out = layers.convolution2d(out, num_outputs=64, kernel_size=4, stride=2, activation_fn=tf.nn.relu)
-                out = layers.convolution2d(out, num_outputs=64, kernel_size=3, stride=1, activation_fn=tf.nn.relu)
-
-            out = layers.flatten(out)
-
-            with tf.variable_scope("action_value"):
-                out = layers.fully_connected(out, num_outputs=512,         activation_fn=tf.nn.relu)
-                out = layers.fully_connected(out, num_outputs=num_actions, activation_fn=None)
-
-        return out, None
-
-def atari_learn(env,
-                session,
-                n_timesteps):
-
+def atari_learn(env, session, n_timesteps):
     lr_schedule = PiecewiseSchedule([
                                          (0,                   1e-4),
                                          (n_timesteps / 10, 1e-4),
@@ -88,7 +36,7 @@ def atari_learn(env,
 
     dqn.learn(
         env,
-        q_func=atari_feedforward(),
+        q_func=q_functions.AtariConvNet(),
         optimizer_spec=optimizer,
         session=session,
         exploration=exploration_schedule,
@@ -142,15 +90,9 @@ def get_env(task, seed):
     return env
 
 def main():
-    # Get Atari games.
-    benchmark = gym.benchmark_spec('Atari200M')
+    task = gym.benchmark_spec('Atari200M').tasks[3]
 
-    # Change the index to select a different game.
-    task = benchmark.tasks[3]
-
-    # Run training
-    seed = 0 # Use a seed of zero (you may want to randomize the seed!)
-    env = get_env(task, seed)
+    env = get_env(task, seed=0)
     session = get_session()
     atari_learn(env, session, n_timesteps=5000000)
 
