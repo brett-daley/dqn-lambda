@@ -1,3 +1,0 @@
-[submodule "trpo/rllab"]
-	path = trpo/rllab
-	url = https://github.com/rll/rllab.git
