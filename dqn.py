@@ -25,7 +25,7 @@ def learn(env,
           target_update_freq=10000,
           grad_norm_clipping=10,
           use_float=False,
-          log_every_n_steps=25000,
+          log_every_n_steps=100000,
     ):
 
     assert type(env.observation_space) == gym.spaces.Box
@@ -82,15 +82,6 @@ def learn(env,
     # construct the replay buffer
     replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, use_float)
 
-    # for benchmarking
-    bm_replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, use_float)
-
-    bm_env = gym.make(env.spec.id)
-    bm_env = gym.wrappers.Monitor(bm_env, 'videos/', force=True, video_callable=lambda e: False)
-    if obs_dtype == tf.uint8:
-        bm_env = wrap_deepmind(bm_env)
-    bm_env.seed(0)
-
     # initialize variables
     session.run(tf.global_variables_initializer())
 
@@ -113,29 +104,11 @@ def learn(env,
 
         return action, rnn_state
 
-    def benchmark(n_episodes):
-        for i in range(n_episodes):
-            obs = bm_env.reset()
-            rnn_state = None
-            done = False
-
-            while not done:
-                idx = bm_replay_buffer.store_frame(obs)
-                obs = bm_replay_buffer.encode_recent_observation()
-
-                action, rnn_state = epsilon_greedy(obs, rnn_state, epsilon=0.05)
-
-                obs, reward, done, _ = bm_env.step(action)
-                bm_replay_buffer.store_effect(idx, action, reward, done)
-
-        rewards = get_wrapper_by_name(bm_env, 'Monitor').get_episode_rewards()[-n_episodes:]
-
-        return np.mean(rewards), np.std(rewards)
-
     best_mean_reward = -float('inf')
     obs = env.reset()
     rnn_state = None
     n_epochs = 0
+    epoch_begin = 0
     start_time = time.time()
 
     for t in itertools.count():
@@ -143,13 +116,22 @@ def learn(env,
             print('Epoch', n_epochs)
             print('Timestep', t)
             print('Realtime {:.3f}'.format(time.time() - start_time))
-            print('Episodes', len(get_wrapper_by_name(env, 'Monitor').get_episode_rewards()))
-            print('Exploration', exploration.value(t))
-            print('Learning rate', optimizer_spec.lr_schedule.value(t))
 
-            mean_reward, std_reward = benchmark(n_episodes=30)
+            if n_epochs == 0:
+                rewards = random_baseline(env, n_episodes=100)
+                start_episode = len(rewards)
+                print('Episodes', 0)
+            else:
+                rewards = get_wrapper_by_name(env, 'Monitor').get_episode_rewards()[epoch_begin:]
+                epoch_begin += len(rewards)
+                print('Episodes', epoch_begin - start_episode)
+
+            mean_reward = np.mean(rewards)
+            std_reward = np.std(rewards)
             best_mean_reward = max(mean_reward, best_mean_reward)
 
+            print('Exploration', exploration.value(t))
+            print('Learning rate', optimizer_spec.lr_schedule.value(t))
             print('Mean reward', mean_reward)
             print('Best mean reward', best_mean_reward)
             print('Standard dev', std_reward)
@@ -162,7 +144,7 @@ def learn(env,
 
         if t % target_update_freq == 0:
             session.run(update_target_fn)
-        
+
         idx = replay_buffer.store_frame(obs)
         obs = replay_buffer.encode_recent_observation()
 
@@ -179,7 +161,7 @@ def learn(env,
         if (t >= learning_starts and
                 t % learning_freq == 0 and
                 replay_buffer.can_sample(batch_size)):
-            
+
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
             feed_dict = {

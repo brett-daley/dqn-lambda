@@ -6,6 +6,20 @@ import numpy as np
 import random
 
 
+def random_baseline(env, n_episodes):
+    for i in range(n_episodes):
+        done = False
+
+        while not done:
+            action = env.action_space.sample()
+            _, _, done, _ = env.step(action)
+
+        env.reset()
+
+    env = get_wrapper_by_name(env, 'Monitor')
+    return env.get_episode_rewards()[-n_episodes:]
+
+
 def get_available_gpus():
     from tensorflow.python.client import device_lib
     local_device_protos = device_lib.list_local_devices()
