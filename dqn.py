@@ -5,7 +5,7 @@ import random
 import tensorflow as tf
 from collections import namedtuple
 import time
-from dqn_utils import *
+from utils import *
 from atari_wrappers import *
 
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
@@ -24,6 +24,8 @@ def learn(env,
           frame_history_len=4,
           target_update_freq=10000,
           grad_norm_clipping=10,
+          use_float=False,
+          log_every_n_steps=25000,
     ):
 
     assert type(env.observation_space) == gym.spaces.Box
@@ -39,10 +41,12 @@ def learn(env,
     n_actions = env.action_space.n
 
     # build model
-    obs_t_ph      = tf.placeholder(tf.uint8,   [None] + list(input_shape))
+    obs_dtype     = tf.float32 if use_float else tf.uint8
+
+    obs_t_ph      = tf.placeholder(obs_dtype,  [None] + list(input_shape))
     act_t_ph      = tf.placeholder(tf.int32,   [None])
     rew_t_ph      = tf.placeholder(tf.float32, [None])
-    obs_tp1_ph    = tf.placeholder(tf.uint8,   [None] + list(input_shape))
+    obs_tp1_ph    = tf.placeholder(obs_dtype,  [None] + list(input_shape))
     done_mask_ph  = tf.placeholder(tf.float32, [None])
 
     qvalues, rnn_state_tf = q_func(obs_t_ph, n_actions, scope='q_func')
@@ -76,14 +80,15 @@ def learn(env,
     update_target_fn = tf.group(*update_target_fn)
 
     # construct the replay buffer
-    replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len)
+    replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, use_float)
 
     # for benchmarking
-    bm_replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len)
+    bm_replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, use_float)
 
     bm_env = gym.make(env.spec.id)
     bm_env = gym.wrappers.Monitor(bm_env, 'videos/', force=True, video_callable=lambda e: False)
-    bm_env = wrap_deepmind(bm_env)
+    if obs_dtype == tf.uint8:
+        bm_env = wrap_deepmind(bm_env)
     bm_env.seed(0)
 
     # initialize variables
@@ -131,11 +136,10 @@ def learn(env,
     obs = env.reset()
     rnn_state = None
     n_epochs = 0
-    LOG_EVERY_N_STEPS = 25000
     start_time = time.time()
 
     for t in itertools.count():
-        if t % LOG_EVERY_N_STEPS == 0:
+        if t % log_every_n_steps == 0:
             print('Epoch', n_epochs)
             print('Timestep', t)
             print('Realtime {:.3f}'.format(time.time() - start_time))

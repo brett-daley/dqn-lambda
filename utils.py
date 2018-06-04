@@ -5,6 +5,35 @@ import tensorflow as tf
 import numpy as np
 import random
 
+
+def get_available_gpus():
+    from tensorflow.python.client import device_lib
+    local_device_protos = device_lib.list_local_devices()
+    return [x.physical_device_desc for x in local_device_protos if x.device_type == 'GPU']
+
+
+def set_global_seeds(i):
+    try:
+        import tensorflow as tf
+    except ImportError:
+        pass
+    else:
+        tf.set_random_seed(i)
+    np.random.seed(i)
+    random.seed(i)
+
+
+def get_session():
+    tf.reset_default_graph()
+    tf_config = tf.ConfigProto(
+                    inter_op_parallelism_threads=1,
+                    intra_op_parallelism_threads=1,
+                )
+    session = tf.Session(config=tf_config)
+    print('AVAILABLE GPUS: ', get_available_gpus())
+    return session
+
+
 def huber_loss(x, delta=1.0):
     # https://en.wikipedia.org/wiki/Huber_loss
     return tf.select(
@@ -12,6 +41,7 @@ def huber_loss(x, delta=1.0):
         tf.square(x) * 0.5,
         delta * (tf.abs(x) - 0.5 * delta)
     )
+
 
 def sample_n_unique(sampling_f, n):
     """Helper function. Given a function `sampling_f` that returns
@@ -24,10 +54,12 @@ def sample_n_unique(sampling_f, n):
             res.append(candidate)
     return res
 
+
 class Schedule(object):
     def value(self, t):
         """Value of the schedule at time t"""
         raise NotImplementedError()
+
 
 class ConstantSchedule(object):
     def __init__(self, value):
@@ -43,8 +75,10 @@ class ConstantSchedule(object):
         """See Schedule.value"""
         return self._v
 
+
 def linear_interpolation(l, r, alpha):
     return l + alpha * (r - l)
+
 
 class PiecewiseSchedule(object):
     def __init__(self, endpoints, interpolation=linear_interpolation, outside_value=None):
@@ -81,6 +115,7 @@ class PiecewiseSchedule(object):
         # t does not belong to any of the pieces, so doom.
         assert self._outside_value is not None
         return self._outside_value
+
 
 class LinearSchedule(object):
     def __init__(self, schedule_timesteps, final_p, initial_p=1.0):
@@ -161,6 +196,7 @@ def initialize_interdependent_variables(session, vars_list, feed_dict):
         else:
             vars_left = new_vars_left
 
+
 def get_wrapper_by_name(env, classname):
     currentenv = env
     while True:
@@ -171,8 +207,9 @@ def get_wrapper_by_name(env, classname):
         else:
             raise ValueError("Couldn't find wrapper named %s"%classname)
 
+
 class ReplayBuffer(object):
-    def __init__(self, size, frame_history_len):
+    def __init__(self, size, frame_history_len, use_float):
         """This is a memory efficient implementation of the replay buffer.
 
         The sepecific memory optimizations use here are:
@@ -200,6 +237,7 @@ class ReplayBuffer(object):
         """
         self.size = size
         self.frame_history_len = frame_history_len
+        self.obs_dtype = (np.float32 if use_float else np.uint8)
 
         self.next_idx      = 0
         self.num_in_buffer = 0
@@ -221,7 +259,6 @@ class ReplayBuffer(object):
         done_mask      = np.array([1.0 if self.done[idx] else 0.0 for idx in idxes], dtype=np.float32)
 
         return obs_batch, act_batch, rew_batch, next_obs_batch, done_mask
-
 
     def sample(self, batch_size):
         """Sample `batch_size` different transitions.
@@ -313,7 +350,7 @@ class ReplayBuffer(object):
             Index at which the frame is stored. To be used for `store_effect` later.
         """
         if self.obs is None:
-            self.obs      = np.empty([self.size] + list(frame.shape), dtype=np.uint8)
+            self.obs      = np.empty([self.size] + list(frame.shape), dtype=self.obs_dtype)
             self.action   = np.empty([self.size],                     dtype=np.int32)
             self.reward   = np.empty([self.size],                     dtype=np.float32)
             self.done     = np.empty([self.size],                     dtype=np.bool)
@@ -345,4 +382,3 @@ class ReplayBuffer(object):
         self.action[idx] = action
         self.reward[idx] = reward
         self.done[idx]   = done
-

@@ -2,7 +2,30 @@ import tensorflow as tf
 from tensorflow.python.layers.layers import *
 
 
-class AtariRecurrentConvNet:
+class QFunction:
+    def is_recurrent(self):
+        raise NotImplementedError
+
+    def __call__(self, state, n_actions, scope):
+        raise NotImplementedError
+
+
+class CartPoleNet(QFunction):
+    def is_recurrent(self):
+        return False
+
+    def __call__(self, state, n_actions, scope):
+        hidden = state
+
+        with tf.variable_scope(scope):
+            hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)
+            hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)
+            qvalues = dense(hidden, units=n_actions, activation=None)
+
+        return qvalues, None
+
+
+class AtariRecurrentConvNet(QFunction):
     def is_recurrent(self):
         return True
 
@@ -28,7 +51,7 @@ class AtariRecurrentConvNet:
         return qvalues, new_rnn_state
 
 
-class AtariConvNet:
+class AtariConvNet(QFunction):
     def is_recurrent(self):
         return False
 
