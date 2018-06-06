@@ -176,17 +176,6 @@ def compute_exponential_averages(variables, decay):
     apply_op = averager.apply(variables)
     return [averager.average(v) for v in variables], apply_op
 
-def minimize_and_clip(optimizer, objective, var_list, clip_val=10):
-    """Minimized `objective` using `optimizer` w.r.t. variables in
-    `var_list` while ensure the norm of the gradients for each
-    variable is clipped to `clip_val`
-    """
-    gradients = optimizer.compute_gradients(objective, var_list=var_list)
-    for i, (grad, var) in enumerate(gradients):
-        if grad is not None:
-            gradients[i] = (tf.clip_by_norm(grad, clip_val), var)
-    return optimizer.apply_gradients(gradients)
-
 def initialize_interdependent_variables(session, vars_list, feed_dict):
     """Initialize a list of variables one at a time, which is useful if
     initialization of some variables depends on initialization of the others.
@@ -223,7 +212,7 @@ def get_wrapper_by_name(env, classname):
 
 
 class ReplayBuffer(object):
-    def __init__(self, size, frame_history_len, use_float):
+    def __init__(self, size, history_len, use_float):
         """This is a memory efficient implementation of the replay buffer.
 
         The sepecific memory optimizations use here are:
@@ -250,7 +239,7 @@ class ReplayBuffer(object):
             Number of memories to be retried for each observation.
         """
         self.size = size
-        self.frame_history_len = frame_history_len
+        self.history_len = history_len
         self.obs_dtype = (np.float32 if use_float else np.uint8)
 
         self.next_idx      = 0
@@ -326,7 +315,7 @@ class ReplayBuffer(object):
 
     def _encode_observation(self, idx):
         end_idx   = idx + 1 # make noninclusive
-        start_idx = end_idx - self.frame_history_len
+        start_idx = end_idx - self.history_len
         # this checks if we are using low-dimensional observations, such as RAM
         # state, in which case we just directly return the latest RAM.
         if len(self.obs.shape) == 2:
@@ -337,7 +326,7 @@ class ReplayBuffer(object):
         for idx in range(start_idx, end_idx - 1):
             if self.done[idx % self.size]:
                 start_idx = idx + 1
-        missing_context = self.frame_history_len - (end_idx - start_idx)
+        missing_context = self.history_len - (end_idx - start_idx)
         # if zero padding is needed for missing context
         # or we are on the boundry of the buffer
         if start_idx < 0 or missing_context > 0:

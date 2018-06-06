@@ -3,16 +3,15 @@ import itertools
 import numpy as np
 import random
 import tensorflow as tf
-from collections import namedtuple
 import time
+
 from utils import *
 from atari_wrappers import *
 
-OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
 
 def learn(env,
           q_func,
-          optimizer_spec,
+          optimizer,
           session,
           exploration=LinearSchedule(1000000, 0.1),
           max_timesteps=50000000,
@@ -21,9 +20,9 @@ def learn(env,
           gamma=0.99,
           learning_starts=50000,
           learning_freq=4,
-          frame_history_len=4,
+          history_len=4,
           target_update_freq=10000,
-          grad_norm_clipping=10,
+          grad_clip=None,
           use_float=False,
           log_every_n_steps=100000,
     ):
@@ -36,7 +35,7 @@ def learn(env,
         input_shape = env.observation_space.shape
     else:
         img_h, img_w, img_c = env.observation_space.shape
-        input_shape = (frame_history_len, img_h, img_w, img_c)
+        input_shape = (history_len, img_h, img_w, img_c)
 
     n_actions = env.action_space.n
 
@@ -64,13 +63,13 @@ def learn(env,
     not_done_td_error = done_td_error + (gamma * targets)
 
     td_error = tf.where(tf.cast(done_mask_ph, tf.bool), x=done_td_error, y=not_done_td_error)
-    total_error = tf.reduce_sum(tf.square(td_error))
+    total_error = tf.reduce_mean(tf.square(td_error))
 
-    # construct optimization op (with gradient clipping)
-    learning_rate = tf.placeholder(tf.float32, (), name="learning_rate")
-    optimizer = optimizer_spec.constructor(learning_rate=learning_rate, **optimizer_spec.kwargs)
-    train_fn = minimize_and_clip(optimizer, total_error,
-                 var_list=q_func_vars, clip_val=grad_norm_clipping)
+    # compute and clip gradients
+    grads_and_vars = optimizer.compute_gradients(total_error, var_list=q_func_vars)
+    if grad_clip is not None:
+        grads_and_vars = [(tf.clip_by_value(g, -grad_clip, +grad_clip), v) for g, v in grads_and_vars]
+    train_op = optimizer.apply_gradients(grads_and_vars)
 
     # update_target_fn will be called periodically to copy Q network to target Q network
     update_target_fn = []
@@ -80,7 +79,7 @@ def learn(env,
     update_target_fn = tf.group(*update_target_fn)
 
     # construct the replay buffer
-    replay_buffer = ReplayBuffer(replay_buffer_size, frame_history_len, use_float)
+    replay_buffer = ReplayBuffer(replay_buffer_size, history_len, use_float)
 
     # initialize variables
     session.run(tf.global_variables_initializer())
@@ -131,7 +130,6 @@ def learn(env,
             best_mean_reward = max(mean_reward, best_mean_reward)
 
             print('Exploration', exploration.value(t))
-            print('Learning rate', optimizer_spec.lr_schedule.value(t))
             print('Mean reward', mean_reward)
             print('Best mean reward', best_mean_reward)
             print('Standard dev', std_reward)
@@ -158,19 +156,13 @@ def learn(env,
             obs = env.reset()
             rnn_state = None
 
-        if (t >= learning_starts and
-                t % learning_freq == 0 and
-                replay_buffer.can_sample(batch_size)):
-
+        if (t >= learning_starts and t % learning_freq == 0):
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
-            feed_dict = {
+            session.run(train_op, feed_dict= {
                 obs_t_ph: obs_batch,
                 act_t_ph: act_batch,
                 rew_t_ph: rew_batch,
                 obs_tp1_ph: next_obs_batch,
                 done_mask_ph: done_mask,
-                learning_rate: optimizer_spec.lr_schedule.value(t),
-            }
-
-            session.run(train_fn, feed_dict=feed_dict)
+            })

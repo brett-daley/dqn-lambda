@@ -8,42 +8,28 @@ from q_functions import *
 
 
 def main():
+    session = utils.get_session()
+
     env = gym.make(gym.benchmark_spec('Atari200M').tasks[3].env_id)
-    env = gym.wrappers.Monitor(env, 'videos/', force=True)
+    env = gym.wrappers.Monitor(env, 'videos/', force=True, video_callable=lambda e: False)
     env = atari_wrappers.wrap_deepmind(env)
 
     seed = 0
     utils.set_global_seeds(seed)
     env.seed(seed)
 
-    session = utils.get_session()
+    optimizer = tf.train.AdamOptimizer(learning_rate=1e-4, epsilon=1e-4)
 
-    n_timesteps = 5000000
-    lr_schedule = utils.PiecewiseSchedule([
-                                         (0,                   1e-4),
-                                         (n_timesteps / 10, 1e-4),
-                                         (n_timesteps / 2,  5e-5),
-                                    ],
-                                    outside_value=5e-5)
-
-    optimizer = dqn.OptimizerSpec(
-        constructor=tf.train.AdamOptimizer,
-        kwargs=dict(epsilon=1e-4),
-        lr_schedule=lr_schedule
-    )
-
+    n_timesteps = 10000000
     exploration_schedule = utils.PiecewiseSchedule(
-        [
-            (0, 1.0),
-            (1e6, 0.1),
-            (n_timesteps / 2, 0.01),
-        ], outside_value=0.01
-    )
+                               [(0, 1.0), (1e6, 0.1), (n_timesteps, 0.05)],
+                               outside_value=0.05,
+                           )
 
     dqn.learn(
         env,
         q_func=AtariConvNet(),
-        optimizer_spec=optimizer,
+        optimizer=optimizer,
         session=session,
         exploration=exploration_schedule,
         max_timesteps=n_timesteps,
@@ -52,9 +38,10 @@ def main():
         gamma=0.99,
         learning_starts=50000,
         learning_freq=4,
-        frame_history_len=4,
+        history_len=4,
         target_update_freq=10000,
-        grad_norm_clipping=10
+        grad_clip=40.,
+        log_every_n_steps=250000,
     )
     env.close()
 
