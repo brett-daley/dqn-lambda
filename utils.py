@@ -314,12 +314,13 @@ class ReplayBuffer(object):
         return self._encode_observation((self.next_idx - 1) % self.size)
 
     def _encode_observation(self, idx):
-        end_idx   = idx + 1 # make noninclusive
-        start_idx = end_idx - self.history_len
         # this checks if we are using low-dimensional observations, such as RAM
         # state, in which case we just directly return the latest RAM.
-        if len(self.obs.shape) == 2:
-            return self.obs[end_idx-1]
+        if len(self.obs.shape) == 2 and self.history_len == 1:
+            return self.obs[idx]
+
+        end_idx   = idx + 1 # make noninclusive
+        start_idx = end_idx - self.history_len
         # if there weren't enough frames ever in the buffer for context
         if start_idx < 0 and self.num_in_buffer != self.size:
             start_idx = 0
