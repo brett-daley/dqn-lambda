@@ -246,10 +246,10 @@ class Episode(object):
 
         self.refresh()
 
-    def _calc_lambda_return(self, qvalues):
+    def _calc_lambda_return(self, qvalues, lambdas):
         lambda_return = self.reward + (self.discount * qvalues)
         for i in reversed(range(self.length - 1)):
-            lambda_return[i] += (self.discount * self.Lambda) * (lambda_return[i+1] - qvalues[i])
+            lambda_return[i] += (self.discount * lambdas[i]) * (lambda_return[i+1] - qvalues[i])
         return lambda_return
 
     def sample(self):
@@ -259,10 +259,10 @@ class Episode(object):
     def refresh(self):
         obs = np.array([self._encode_observation(i) for i in range(self.length)])
 
-        qvalues = self.refresh_func(obs)
+        qvalues, lambdas = self.refresh_func(obs, self.action)
         qvalues = np.pad(qvalues[1:], pad_width=(0,1), mode='constant')
 
-        self.lambda_return = self._calc_lambda_return(qvalues)
+        self.lambda_return = self._calc_lambda_return(qvalues, lambdas)
 
     def _encode_observation(self, idx):
         end = (idx % self.length) + 1 # make noninclusive

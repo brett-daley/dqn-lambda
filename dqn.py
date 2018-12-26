@@ -53,8 +53,6 @@ def learn(env,
     action_indices = tf.stack([tf.range(tf.size(act_t_ph)), act_t_ph], axis=-1)
     onpolicy_qvalues = tf.gather_nd(qvalues, action_indices)
 
-    max_qvalues = tf.reduce_max(qvalues, axis=-1)
-
     td_error = rew_t_ph - onpolicy_qvalues
     total_error = tf.reduce_mean(tf.square(td_error))
 
@@ -64,13 +62,24 @@ def learn(env,
         grads_and_vars = [(tf.clip_by_value(g, -grad_clip, +grad_clip), v) for g, v in grads_and_vars]
     train_op = optimizer.apply_gradients(grads_and_vars)
 
+    def refresh(states, actions):
+        onpolicy_qvals, qvals = session.run([onpolicy_qvalues, qvalues], feed_dict={
+            obs_t_ph: states,
+            act_t_ph: actions,
+        })
+
+        lambdas = Lambda * (actions == np.argmax(qvals, axis=1))
+        onpolicy_qvals = np.pad(onpolicy_qvals[1:], pad_width=(0,1), mode='constant')
+        lambdas = np.pad(lambdas[1:], pad_width=(0,1), mode='constant')
+        return onpolicy_qvals, lambdas
+
     # construct the replay buffer
     replay_buffer = ReplayBuffer(
                         replay_buffer_size,
                         history_len,
                         gamma,
                         Lambda,
-                        refresh_func=lambda obs: session.run(max_qvalues, feed_dict={obs_t_ph: obs})
+                        refresh,
                     )
 
     # initialize variables
