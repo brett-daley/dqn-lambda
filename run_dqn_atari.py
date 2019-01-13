@@ -7,12 +7,19 @@ import atari_wrappers
 from q_functions import *
 
 
+def make_atari_env(name):
+    from gym.wrappers.monitor import Monitor
+    from gym.envs.atari.atari_env import AtariEnv
+
+    env = AtariEnv(game=name, frameskip=4, obs_type='image')
+    env = Monitor(env, 'videos/', force=True, video_callable=lambda e: False)
+    env = atari_wrappers.wrap_deepmind(env)
+    return env
+
+
 def main():
     session = utils.get_session()
-
-    env = gym.make(gym.benchmark_spec('Atari200M').tasks[3].env_id)
-    env = gym.wrappers.Monitor(env, 'videos/', force=True, video_callable=lambda e: False)
-    env = atari_wrappers.wrap_deepmind(env)
+    env = make_atari_env('pong')
 
     seed = 0
     utils.set_global_seeds(seed)
