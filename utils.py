@@ -314,29 +314,16 @@ class ReplayBuffer(object):
         return self._encode_observation((self.next_idx - 1) % self.size)
 
     def _encode_observation(self, idx):
-        # this checks if we are using low-dimensional observations, such as RAM
-        # state, in which case we just directly return the latest RAM.
-        if len(self.obs.shape) == 2 and self.history_len == 1:
-            return self.obs[idx]
+        end   = idx + 1 # make noninclusive
+        start = end - self.history_len
 
-        end_idx   = idx + 1 # make noninclusive
-        start_idx = end_idx - self.history_len
-        # if there weren't enough frames ever in the buffer for context
-        if start_idx < 0 and self.num_in_buffer != self.size:
-            start_idx = 0
-        for idx in range(start_idx, end_idx - 1):
-            if self.done[idx % self.size]:
-                start_idx = idx + 1
-        missing_context = self.history_len - (end_idx - start_idx)
-        # if zero padding is needed for missing context
-        # or we are on the boundry of the buffer
-        if start_idx < 0 or missing_context > 0:
-            frames = [np.zeros_like(self.obs[0]) for _ in range(missing_context)]
-            for idx in range(start_idx, end_idx):
-                frames.append(self.obs[idx % self.size])
-            return np.array(frames)
-        else:
-            return self.obs[start_idx:end_idx]
+        pad_len = max(0, -start)
+        padding = [np.zeros_like(self.obs[0]) for _ in range(pad_len)]
+
+        start = max(0, start)
+        obs = [x for x in self.obs[start:end]]
+
+        return np.array(padding + obs)
 
     def store_frame(self, frame):
         """Store a single frame in the buffer at the next available index, overwriting

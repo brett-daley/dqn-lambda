@@ -30,8 +30,7 @@ def learn(env,
     assert type(env.observation_space) == gym.spaces.Box
     assert type(env.action_space)      == gym.spaces.Discrete
 
-    input_shape = env.observation_space.shape if history_len == 1 else (history_len, *env.observation_space.shape)
-
+    input_shape = (history_len, *env.observation_space.shape)
     n_actions = env.action_space.n
 
     # build model
