@@ -15,7 +15,7 @@ class CartPoleNet(QFunction):
         return False
 
     def __call__(self, state, n_actions, scope):
-        hidden = state
+        hidden = flatten(state) # flatten to make sure 2-D
 
         with tf.variable_scope(scope):
             hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)

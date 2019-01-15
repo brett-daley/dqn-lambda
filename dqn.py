@@ -30,13 +30,7 @@ def learn(env,
     assert type(env.observation_space) == gym.spaces.Box
     assert type(env.action_space)      == gym.spaces.Discrete
 
-    if len(env.observation_space.shape) == 1:
-        # This means we are running on low-dimensional observations (e.g. RAM)
-        input_shape = env.observation_space.shape
-    else:
-        img_h, img_w, img_c = env.observation_space.shape
-        input_shape = (history_len, img_h, img_w, img_c)
-
+    input_shape = (history_len, *env.observation_space.shape)
     n_actions = env.action_space.n
 
     # build model
