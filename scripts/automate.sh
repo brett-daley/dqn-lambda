@@ -4,7 +4,7 @@ PYTHON_CMD="`which python` run_dqn_atari.py"
 OUTPUT_DIR='output'
 
 ENVS='BreakoutNoFrameskip-v4 PongNoFrameskip-v4 QbertNoFrameskip-v4 SeaquestNoFrameskip-v4'
-LAMBDAS='0.0 0.6 0.7 0.8'
+LAMBDAS='0.6 0.7 0.8'
 SEED='0'
 
 if [ -z "$CUDA_VISIBLE_DEVICES" ]; then
@@ -30,15 +30,15 @@ function run () {
 
 for env in $ENVS; do
     for lambda in $LAMBDAS; do
-        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history_len 1 --seed $SEED"
+        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history-len 1 --seed $SEED"
         filename="dqn_${env}_1_e${lambda}.txt"
         run "$cmd" "$filename"
 
-        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history_len 4 --seed $SEED"
+        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history-len 4 --seed $SEED"
         filename="dqn_${env}_4_e${lambda}.txt"
         run "$cmd" "$filename"
 
-        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history_len 4 --recurrent --seed $SEED"
+        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history-len 4 --recurrent --seed $SEED"
         filename="dqn_${env}_rec_e${lambda}.txt"
         run "$cmd" "$filename"
     done
