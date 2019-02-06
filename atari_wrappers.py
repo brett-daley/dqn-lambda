@@ -80,21 +80,15 @@ class EpisodicLifeEnv(gym.Wrapper):
         self.lives = self.env.unwrapped.ale.lives()
         return obs
 
-def _process_frame84(frame):
-    img = np.reshape(frame, [210, 160, 3]).astype(np.float32)
-    img = img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + img[:, :, 2] * 0.114
-    resized_screen = cv2.resize(img, (84, 110),  interpolation=cv2.INTER_LINEAR)
-    x_t = resized_screen[18:102, :]
-    x_t = np.reshape(x_t, [84, 84, 1])
-    return x_t.astype(np.uint8)
-
 class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
 
     def observation(self, observation):
-        return _process_frame84(observation)
+        observation = cv2.cvtColor(observation, cv2.COLOR_BGR2GRAY)
+        observation = cv2.resize(observation, (84, 84), interpolation=cv2.INTER_LINEAR)
+        return np.reshape(observation, [84, 84, 1]).astype(np.uint8)
 
 class ClippedRewardsWrapper(gym.RewardWrapper):
     def reward(self, reward):
