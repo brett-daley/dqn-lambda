@@ -42,12 +42,10 @@ def main():
                         Lambda=args.Lambda,
                     )
 
-    q_func = AtariRecurrentConvNet() if args.recurrent else AtariConvNet()
-
     dqn.learn(
         env,
         benchmark_env,
-        q_func,
+        AtariRecurrentConvNet if args.recurrent else AtariConvNet,
         replay_memory,
         optimizer=optimizer,
         exploration=exploration_schedule,

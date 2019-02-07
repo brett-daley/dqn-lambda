@@ -40,7 +40,7 @@ def main():
     dqn.learn(
         env,
         benchmark_env,
-        CartPoleNet(),
+        CartPoleNet,
         replay_memory,
         optimizer=optimizer,
         exploration=exploration_schedule,
