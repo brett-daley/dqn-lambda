@@ -16,8 +16,15 @@ def random_baseline(env, n_episodes):
 
         env.reset()
 
-    env = get_wrapper_by_name(env, 'Monitor')
-    return env.get_episode_rewards()[-n_episodes:]
+    return get_episode_rewards(env)[-n_episodes:]
+
+
+def get_episode_rewards(env):
+    if isinstance(env, gym.wrappers.Monitor):
+        return env.get_episode_rewards()
+    elif hasattr(env, 'env'):
+        return get_episode_rewards(env.env)
+    raise ValueError('No Monitor wrapper around env')
 
 
 def get_available_gpus():
@@ -198,14 +205,3 @@ def initialize_interdependent_variables(session, vars_list, feed_dict):
             raise Exception("Cycle in variable dependencies, or extenrnal precondition unsatisfied.")
         else:
             vars_left = new_vars_left
-
-
-def get_wrapper_by_name(env, classname):
-    currentenv = env
-    while True:
-        if classname in currentenv.__class__.__name__:
-            return currentenv
-        elif isinstance(env, gym.Wrapper):
-            currentenv = currentenv.env
-        else:
-            raise ValueError("Couldn't find wrapper named %s"%classname)

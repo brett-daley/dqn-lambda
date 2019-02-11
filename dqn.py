@@ -101,7 +101,7 @@ def learn(env,
                 start_episode = len(rewards)
                 print('Episodes', 0)
             else:
-                rewards = get_wrapper_by_name(env, 'Monitor').get_episode_rewards()[epoch_begin:]
+                rewards = get_episode_rewards(env)[epoch_begin:]
                 epoch_begin += len(rewards)
                 print('Episodes', epoch_begin - start_episode)
 
