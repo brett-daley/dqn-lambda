@@ -5,7 +5,7 @@ import argparse
 import dqn
 import utils
 from q_functions import *
-from replay_memory import LambdaReplayMemory
+from replay_memory import RenormalizedLambdaReplayMemory
 from run_dqn_atari import make_atari_env
 
 
@@ -35,7 +35,7 @@ def main():
                                outside_value=0.1,
                            )
 
-    replay_memory = LambdaReplayMemory(
+    replay_memory = RenormalizedLambdaReplayMemory(
                         size=1000000,
                         history_len=args.history_len,
                         discount=0.99,

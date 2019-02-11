@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from replay_memory import NStepReplayMemory, LambdaReplayMemory
+from replay_memory import NStepReplayMemory, LambdaReplayMemory, RenormalizedLambdaReplayMemory
 
 
 class TestCaseReturns(unittest.TestCase):
@@ -123,3 +123,57 @@ class TestCaseReturns(unittest.TestCase):
         self.assertNumpyEqual(e.obs,     np.array([      3,     4,    5,    6,     7]))
         self.assertNumpyEqual(e.action,  np.array([      6,     4,    2,    5,     3]))
         self.assertNumpyEqual(e.returns, np.array([112.624, 109.2, 60.0, 47.2, -40.0]))
+
+    def test_pengs_renormalized_lambda(self):
+        replay_memory = RenormalizedLambdaReplayMemory(
+            size=20,
+            history_len=1,
+            discount=0.9,
+            Lambda=0.5,
+        )
+        replay_memory.register_refresh_func(self.refresh)
+
+        for state, action, reward, done in self.transitions:
+            replay_memory.store_frame(state)
+            state = replay_memory.encode_recent_observation()
+            replay_memory.store_effect(action, reward, done)
+
+        # First episode
+        e = replay_memory.episodes[0]
+        self.assertNumpyEqual(e.obs,     np.array([           0,     1,    2]))
+        self.assertNumpyEqual(e.action,  np.array([           7,     0,    1]))
+        self.assertNumpyEqual(e.returns, np.array([180.74285714, 176.0, 20.0]))
+
+        # Second episode
+        e = replay_memory.episodes[1]
+        self.assertNumpyEqual(e.obs,     np.array([           3,       4,           5,     6,     7]))
+        self.assertNumpyEqual(e.action,  np.array([           6,       4,           2,     5,     3]))
+        self.assertNumpyEqual(e.returns, np.array([188.58632258, 158.976, 78.51428571, 148.0, -40.0]))
+
+    def test_watkins_renormalized_lambda(self):
+        self.exp_mask = np.array([1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0])  # Suppose a_1 and a_5 are exploratory
+
+        replay_memory = RenormalizedLambdaReplayMemory(
+            size=20,
+            history_len=1,
+            discount=0.9,
+            Lambda=0.5,
+        )
+        replay_memory.register_refresh_func(self.refresh)
+
+        for state, action, reward, done in self.transitions:
+            replay_memory.store_frame(state)
+            state = replay_memory.encode_recent_observation()
+            replay_memory.store_effect(action, reward, done)
+
+        # First episode
+        e = replay_memory.episodes[0]
+        self.assertNumpyEqual(e.obs,     np.array([    0,     1,    2]))
+        self.assertNumpyEqual(e.action,  np.array([    7,     0,    1]))
+        self.assertNumpyEqual(e.returns, np.array([208.0, 260.0, 20.0]))
+
+        # Second episode
+        e = replay_memory.episodes[1]
+        self.assertNumpyEqual(e.obs,     np.array([          3,     4,    5,     6,     7]))
+        self.assertNumpyEqual(e.action,  np.array([          6,     4,    2,     5,     3]))
+        self.assertNumpyEqual(e.returns, np.array([199.08571429, 168.0, 60.0, 148.0, -40.0]))
