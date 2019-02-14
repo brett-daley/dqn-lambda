@@ -1,11 +1,13 @@
 #!/bin/bash
 
-PYTHON_CMD="`which python` run_dqn_atari.py"
+PYTHON_NSTEP_CMD="`which python` run_dqn_atari.py"
+PYTHON_LAMBDA_CMD="`which python` run_dqnlambda_atari.py"
 OUTPUT_DIR='output'
 
-ENVS='BreakoutNoFrameskip-v4 PongNoFrameskip-v4 QbertNoFrameskip-v4 SeaquestNoFrameskip-v4'
-LAMBDAS='0.6 0.7 0.8'
-SEED='0'
+ENVS='beam_rider breakout pong qbert seaquest'
+NSTEPS='1 3'
+LAMBDAS='0.6 0.8'
+SEEDS='0 1 2'
 
 if [ -z "$CUDA_VISIBLE_DEVICES" ]; then
     echo "Must set CUDA_VISIBLE_DEVICES"
@@ -29,17 +31,33 @@ function run () {
 }
 
 for env in $ENVS; do
-    for lambda in $LAMBDAS; do
-        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history-len 1 --seed $SEED"
-        filename="dqn_${env}_1_e${lambda}.txt"
-        run "$cmd" "$filename"
+    for seed in $SEEDS; do
+        for n in $NSTEPS; do
+            cmd="$PYTHON_NSTEP_CMD --env $env --nsteps $n --history-len 1 --seed $seed"
+            filename="dqn_${env}_len1_nsteps${n}_seed${seed}.txt"
+            run "$cmd" "$filename"
 
-        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history-len 4 --seed $SEED"
-        filename="dqn_${env}_4_e${lambda}.txt"
-        run "$cmd" "$filename"
+            cmd="$PYTHON_NSTEP_CMD --env $env --nsteps $n --history-len 4 --seed $seed"
+            filename="dqn_${env}_len4_nsteps${n}_seed${seed}.txt"
+            run "$cmd" "$filename"
 
-        cmd="$PYTHON_CMD --env $env --Lambda $lambda --history-len 4 --recurrent --seed $SEED"
-        filename="dqn_${env}_rec_e${lambda}.txt"
-        run "$cmd" "$filename"
+            cmd="$PYTHON_NSTEP_CMD --env $env --nsteps $n --history-len 4 --recurrent --seed $seed"
+            filename="drqn_${env}_len4_nsteps${n}_seed${seed}.txt"
+            run "$cmd" "$filename"
+        done
+
+        for lve in $LAMBDAS; do
+            cmd="$PYTHON_LAMBDA_CMD --env $env --Lambda $lve --history-len 1 --seed $seed"
+            filename="dqn_${env}_len1_lve${lve}_seed${seed}.txt"
+            run "$cmd" "$filename"
+
+            cmd="$PYTHON_LAMBDA_CMD --env $env --Lambda $lve --history-len 4 --seed $seed"
+            filename="dqn_${env}_len4_lve${lve}_seed${seed}.txt"
+            run "$cmd" "$filename"
+
+            cmd="$PYTHON_LAMBDA_CMD --env $env --Lambda $lve --history-len 4 --recurrent --seed $seed"
+            filename="drqn_${env}_len4_lve${lve}_seed${seed}.txt"
+            run "$cmd" "$filename"
+        done
     done
 done
