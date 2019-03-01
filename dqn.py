@@ -23,6 +23,7 @@ def learn(env,
           log_every_n_steps=100000,
     ):
 
+    assert (learning_starts % target_update_freq) == 0
     assert type(env.observation_space) == gym.spaces.Box
     assert type(env.action_space)      == gym.spaces.Discrete
 
@@ -32,9 +33,9 @@ def learn(env,
     # build model
     session = get_session()
 
-    obs_t_ph      = tf.placeholder(tf.float32, [None] + list(input_shape))
-    act_t_ph      = tf.placeholder(tf.int32,   [None])
-    return_ph     = tf.placeholder(tf.float32, [None])
+    obs_t_ph  = tf.placeholder(env.observation_space.dtype, [None] + list(input_shape))
+    act_t_ph  = tf.placeholder(tf.int32,   [None])
+    return_ph = tf.placeholder(tf.float32, [None])
 
     qvalues, rnn_state_tf = q_func(obs_t_ph, n_actions, scope='q_func')
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
@@ -120,9 +121,6 @@ def learn(env,
         if t >= max_timesteps:
             break
 
-        if t % target_update_freq == 0:
-            replay_memory.refresh()
-
         replay_memory.store_frame(obs)
         obs = replay_memory.encode_recent_observation()
 
@@ -136,11 +134,15 @@ def learn(env,
             obs = env.reset()
             rnn_state = None
 
-        if (t >= learning_starts and t % learning_freq == 0):
-            obs_batch, act_batch, ret_batch = replay_memory.sample(batch_size)
+        if t >= learning_starts:
+            if t % target_update_freq == 0:
+                replay_memory.refresh()
 
-            session.run(train_op, feed_dict= {
-                obs_t_ph: obs_batch,
-                act_t_ph: act_batch,
-                return_ph: ret_batch,
-            })
+            if t % learning_freq == 0:
+                obs_batch, act_batch, ret_batch = replay_memory.sample(batch_size)
+
+                session.run(train_op, feed_dict={
+                    obs_t_ph:  obs_batch,
+                    act_t_ph:  act_batch,
+                    return_ph: ret_batch,
+                })

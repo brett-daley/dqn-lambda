@@ -38,8 +38,9 @@ def main():
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-4, epsilon=1e-4)
 
     n_timesteps = 10000000
+    learning_starts = 50000
     exploration_schedule = utils.PiecewiseSchedule(
-                               [(0, 1.0), (1e6, 0.1), (n_timesteps, 0.05)],
+                               [(0, 1.0), (learning_starts, 1.0), (learning_starts + 1e6, 0.1), (n_timesteps, 0.05)],
                                outside_value=0.05,
                            )
 
@@ -60,7 +61,7 @@ def main():
         exploration=exploration_schedule,
         max_timesteps=n_timesteps,
         batch_size=32,
-        learning_starts=50000,
+        learning_starts=learning_starts,
         learning_freq=4,
         target_update_freq=10000,
         grad_clip=40.,

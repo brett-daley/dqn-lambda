@@ -23,6 +23,16 @@ class TestCaseReturns(unittest.TestCase):
         # Now remove qvalues from transitions, because tests don't need them explicitly
         self.transitions = [(np.array(state), np.array(action), reward, done) for state, action, reward, done, _ in self.transitions]
 
+    def prepare(self, replay_memory):
+        replay_memory.register_refresh_func(self.refresh)
+
+        for state, action, reward, done in self.transitions:
+            replay_memory.store_frame(state)
+            state = replay_memory.encode_recent_observation()
+            replay_memory.store_effect(action, reward, done)
+
+        replay_memory.refresh()
+
     def assertNumpyEqual(self, x, y):
         self.assertEqual(x.shape, y.shape)
         self.assertEqual(x.dtype, y.dtype)
@@ -35,12 +45,7 @@ class TestCaseReturns(unittest.TestCase):
             discount=0.9,
             nsteps=1,
         )
-        replay_memory.register_refresh_func(self.refresh)
-
-        for state, action, reward, done in self.transitions:
-            replay_memory.store_frame(state)
-            state = replay_memory.encode_recent_observation()
-            replay_memory.store_effect(action, reward, done)
+        self.prepare(replay_memory)
 
         # First episode
         e = replay_memory.episodes[0]
@@ -61,12 +66,7 @@ class TestCaseReturns(unittest.TestCase):
             discount=0.9,
             nsteps=3,
         )
-        replay_memory.register_refresh_func(self.refresh)
-
-        for state, action, reward, done in self.transitions:
-            replay_memory.store_frame(state)
-            state = replay_memory.encode_recent_observation()
-            replay_memory.store_effect(action, reward, done)
+        self.prepare(replay_memory)
 
         # First episode
         e = replay_memory.episodes[0]
@@ -87,12 +87,7 @@ class TestCaseReturns(unittest.TestCase):
             discount=0.9,
             Lambda=0.8,
         )
-        replay_memory.register_refresh_func(self.refresh)
-
-        for state, action, reward, done in self.transitions:
-            replay_memory.store_frame(state)
-            state = replay_memory.encode_recent_observation()
-            replay_memory.store_effect(action, reward, done)
+        self.prepare(replay_memory)
 
         # First episode
         e = replay_memory.episodes[0]
@@ -115,12 +110,7 @@ class TestCaseReturns(unittest.TestCase):
             discount=0.9,
             Lambda=0.8,
         )
-        replay_memory.register_refresh_func(self.refresh)
-
-        for state, action, reward, done in self.transitions:
-            replay_memory.store_frame(state)
-            state = replay_memory.encode_recent_observation()
-            replay_memory.store_effect(action, reward, done)
+        self.prepare(replay_memory)
 
         # First episode
         e = replay_memory.episodes[0]

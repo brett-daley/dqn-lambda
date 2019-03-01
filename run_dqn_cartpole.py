@@ -17,14 +17,15 @@ def main():
 
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
 
-    n_timesteps = 1000000
+    n_timesteps = 500000
+    learning_starts = 50000
     exploration_schedule = utils.PiecewiseSchedule(
-                               [(0, 1.0), (2e5, 0.1)],
+                               [(0, 1.0), (learning_starts, 1.0), (learning_starts + 3e5, 0.1)],
                                outside_value=0.1,
                            )
 
     replay_memory = NStepReplayMemory(
-                        size=1000000,
+                        size=500000,
                         history_len=1,
                         discount=0.99,
                         nsteps=1,
@@ -38,9 +39,9 @@ def main():
         exploration=exploration_schedule,
         max_timesteps=n_timesteps,
         batch_size=32,
-        learning_starts=10000,
+        learning_starts=learning_starts,
         learning_freq=4,
-        target_update_freq=250,
+        target_update_freq=10000,
         log_every_n_steps=25000,
     )
     env.close()
