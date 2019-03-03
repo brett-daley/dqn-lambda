@@ -17,7 +17,7 @@ class CartPoleNet(QFunction):
     def __call__(self, state, n_actions, scope):
         hidden = flatten(state) # flatten to make sure 2-D
 
-        with tf.variable_scope(scope):
+        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)
             hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)
             qvalues = dense(hidden, units=n_actions, activation=None)
@@ -35,7 +35,7 @@ class AtariRecurrentConvNet(QFunction):
         hidden = tf.reshape(state, [-1, state.shape[2], state.shape[3], state.shape[4]])
         print('Recurrent', state.shape)
 
-        with tf.variable_scope(scope):
+        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             hidden = conv2d(hidden, filters=32, kernel_size=8, strides=4, activation=tf.nn.relu)
             hidden = conv2d(hidden, filters=64, kernel_size=4, strides=2, activation=tf.nn.relu)
             hidden = conv2d(hidden, filters=64, kernel_size=3, strides=1, activation=tf.nn.relu)
@@ -63,7 +63,7 @@ class AtariConvNet(QFunction):
         hidden = tf.concat(hidden, axis=-1)
         print('Feedforward', hidden.shape)
 
-        with tf.variable_scope(scope):
+        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             hidden = conv2d(hidden, filters=32, kernel_size=8, strides=4, activation=tf.nn.relu)
             hidden = conv2d(hidden, filters=64, kernel_size=4, strides=2, activation=tf.nn.relu)
             hidden = conv2d(hidden, filters=64, kernel_size=3, strides=1, activation=tf.nn.relu)

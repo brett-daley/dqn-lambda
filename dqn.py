@@ -38,7 +38,7 @@ def learn(env,
     return_ph = tf.placeholder(tf.float32, [None])
 
     qvalues, rnn_state_tf = q_func(obs_t_ph, n_actions, scope='q_func')
-    q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
+    greedy_action = tf.argmax(qvalues, axis=1)
 
     action_indices = tf.stack([tf.range(tf.size(act_t_ph)), act_t_ph], axis=-1)
     onpolicy_qvalues = tf.gather_nd(qvalues, action_indices)
@@ -47,17 +47,17 @@ def learn(env,
     total_error = tf.reduce_mean(tf.square(td_error))
 
     # compute and clip gradients
-    grads_and_vars = optimizer.compute_gradients(total_error, var_list=q_func_vars)
+    grads_and_vars = optimizer.compute_gradients(total_error, var_list=tf.trainable_variables(scope='q_func'))
     if grad_clip is not None:
         grads_and_vars = [(tf.clip_by_value(g, -grad_clip, +grad_clip), v) for g, v in grads_and_vars]
     train_op = optimizer.apply_gradients(grads_and_vars)
 
     def refresh(states, actions):
-        onpolicy_qvals, qvals = session.run([onpolicy_qvalues, qvalues], feed_dict={
+        onpolicy_qvals, greedy = session.run([onpolicy_qvalues, greedy_action], feed_dict={
             obs_t_ph: states,
             act_t_ph: actions,
         })
-        mask = (actions == np.argmax(qvals, axis=1))
+        mask = (actions == greedy)
         return onpolicy_qvals, mask
 
     replay_memory.register_refresh_func(refresh)
@@ -65,22 +65,22 @@ def learn(env,
     # initialize variables
     session.run(tf.global_variables_initializer())
 
-    def epsilon_greedy(obs, rnn_state, epsilon):
-        if q_func.is_recurrent():
-            feed_dict = {obs_t_ph: obs[None]}
+    def epsilon_greedy(obs, epsilon):
+        if random.random() < epsilon:
+            return env.action_space.sample()
+        return session.run(greedy_action, feed_dict={obs_t_ph: obs[None]})[0]
 
-            if rnn_state is not None:
-                feed_dict[q_func.rnn_state] = rnn_state
-
-            q, rnn_state = session.run([qvalues, rnn_state_tf], feed_dict)
-
-        else:
-            q = session.run(qvalues, feed_dict={obs_t_ph: obs[None]})
+    def epsilon_greedy_rnn(obs, rnn_state, epsilon):
+        feed_dict = {obs_t_ph: obs[None]}
+        if rnn_state is not None:
+            feed_dict[q_func.rnn_state] = rnn_state
 
         if random.random() < epsilon:
             action = env.action_space.sample()
+            rnn_state = session.run(rnn_state_tf, feed_dict)
         else:
-            action = np.argmax(q)
+            action, rnn_state = session.run([greedy_action, rnn_state_tf], feed_dict)
+            action = action[0]
 
         return action, rnn_state
 
@@ -125,7 +125,10 @@ def learn(env,
         obs = replay_memory.encode_recent_observation()
 
         epsilon = exploration.value(t)
-        action, rnn_state = epsilon_greedy(obs, rnn_state, epsilon)
+        if q_func.is_recurrent():
+            action, rnn_state = epsilon_greedy_rnn(obs, rnn_state, epsilon)
+        else:
+            action = epsilon_greedy(obs, epsilon)
 
         obs, reward, done, _ = env.step(action)
         replay_memory.store_effect(action, reward, done)
