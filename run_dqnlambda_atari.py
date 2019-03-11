@@ -5,7 +5,7 @@ import argparse
 import dqn
 import utils
 from q_functions import *
-from replay_memory import RenormalizedLambdaReplayMemory
+from replay_memory import LambdaReplayMemory
 from run_dqn_atari import make_atari_env
 
 
@@ -15,6 +15,8 @@ def get_args():
     parser.add_argument('--Lambda',      type=float, default=1.0)
     parser.add_argument('--history-len', type=int,   default=4)
     parser.add_argument('--seed',        type=int,   default=0)
+    parser.add_argument('--renorm',      action='store_true')
+    parser.add_argument('--watkins',     action='store_true')
     parser.add_argument('--recurrent',   action='store_true')
     return parser.parse_args()
 
@@ -35,11 +37,13 @@ def main():
                                outside_value=0.1,
                            )
 
-    replay_memory = RenormalizedLambdaReplayMemory(
+    replay_memory = LambdaReplayMemory(
                         size=1000000,
                         history_len=args.history_len,
                         discount=0.99,
                         Lambda=args.Lambda,
+                        renormalize=args.renorm,
+                        use_watkins=args.watkins,
                     )
 
     dqn.learn(
