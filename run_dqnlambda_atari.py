@@ -21,18 +21,18 @@ def get_args():
 
 def main():
     args = get_args()
-    env = make_atari_env(args.env)
-
     utils.set_global_seeds(args.seed)
-    env.seed(args.seed)
+
+    env = make_atari_env(args.env, args.seed)
+    benchmark_env = make_atari_env(args.env, args.seed+1)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-4, epsilon=1e-4)
 
     n_timesteps = 10000000
     learning_starts = 50000
     exploration_schedule = utils.PiecewiseSchedule(
-                               [(0, 1.0), (learning_starts, 1.0), (learning_starts + 1e6, 0.1), (n_timesteps, 0.05)],
-                               outside_value=0.05,
+                               [(0, 1.0), (learning_starts, 1.0), (learning_starts + 1e6, 0.1)],
+                               outside_value=0.1,
                            )
 
     replay_memory = LambdaReplayMemory(
@@ -46,6 +46,7 @@ def main():
 
     dqn.learn(
         env,
+        benchmark_env,
         q_func,
         replay_memory,
         optimizer=optimizer,
@@ -56,7 +57,7 @@ def main():
         learning_freq=4,
         target_update_freq=10000,
         grad_clip=40.,
-        log_every_n_steps=250000,
+        log_every_n_steps=50000,
     )
     env.close()
 

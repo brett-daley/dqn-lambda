@@ -6,15 +6,14 @@ import numpy as np
 import random
 
 
-def random_baseline(env, n_episodes):
-    for i in range(n_episodes):
+def benchmark(env, policy, epsilon, n_episodes):
+    for _ in range(n_episodes):
+        state = env.reset()
+        rnn_state = None
         done = False
-
         while not done:
-            action = env.action_space.sample()
-            _, _, done, _ = env.step(action)
-
-        env.reset()
+            action, rnn_state = policy(state, rnn_state, epsilon)
+            state, _, done, _ = env.step(action)
 
     return get_episode_rewards(env)[-n_episodes:]
 

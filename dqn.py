@@ -6,10 +6,11 @@ import tensorflow as tf
 import time
 
 from utils import *
-from atari_wrappers import *
+from wrappers import *
 
 
 def learn(env,
+          benchmark_env,
           q_func,
           replay_memory,
           optimizer,
@@ -21,6 +22,7 @@ def learn(env,
           target_update_freq=10000,
           grad_clip=None,
           log_every_n_steps=100000,
+          mov_avg_size=300,
     ):
 
     assert (learning_starts % target_update_freq) == 0
@@ -29,6 +31,7 @@ def learn(env,
 
     input_shape = (replay_memory.history_len, *env.observation_space.shape)
     n_actions = env.action_space.n
+    benchmark_env = HistoryWrapper(benchmark_env, replay_memory.history_len)
 
     # build model
     session = get_session()
@@ -65,10 +68,12 @@ def learn(env,
     # initialize variables
     session.run(tf.global_variables_initializer())
 
-    def epsilon_greedy(obs, epsilon):
+    def epsilon_greedy(obs, rnn_state, epsilon):
         if random.random() < epsilon:
-            return env.action_space.sample()
-        return session.run(greedy_action, feed_dict={obs_t_ph: obs[None]})[0]
+            action = env.action_space.sample()
+        else:
+            action = session.run(greedy_action, feed_dict={obs_t_ph: obs[None]})[0]
+        return action, None
 
     def epsilon_greedy_rnn(obs, rnn_state, epsilon):
         feed_dict = {obs_t_ph: obs[None]}
@@ -88,7 +93,8 @@ def learn(env,
     obs = env.reset()
     rnn_state = None
     n_epochs = 0
-    epoch_begin = 0
+    policy = epsilon_greedy_rnn if q_func.is_recurrent() else epsilon_greedy
+    rewards = deque(benchmark(benchmark_env, policy, epsilon=1.0, n_episodes=mov_avg_size), maxlen=mov_avg_size)
     start_time = time.time()
 
     for t in itertools.count():
@@ -97,19 +103,12 @@ def learn(env,
             print('Timestep', t)
             print('Realtime {:.3f}'.format(time.time() - start_time))
 
-            if n_epochs == 0:
-                rewards = random_baseline(env, n_episodes=100)
-                start_episode = len(rewards)
-                print('Episodes', 0)
-            else:
-                rewards = get_episode_rewards(env)[epoch_begin:]
-                epoch_begin += len(rewards)
-                print('Episodes', epoch_begin - start_episode)
-
+            rewards.extend(get_episode_rewards(env))
             mean_reward = np.mean(rewards)
             std_reward = np.std(rewards)
             best_mean_reward = max(mean_reward, best_mean_reward)
 
+            print('Episodes', len(get_episode_rewards(env)))
             print('Exploration', exploration.value(t))
             print('Mean reward', mean_reward)
             print('Best mean reward', best_mean_reward)
@@ -124,13 +123,9 @@ def learn(env,
         replay_memory.store_frame(obs)
         obs = replay_memory.encode_recent_observation()
 
-        epsilon = exploration.value(t)
-        if q_func.is_recurrent():
-            action, rnn_state = epsilon_greedy_rnn(obs, rnn_state, epsilon)
-        else:
-            action = epsilon_greedy(obs, epsilon)
-
+        action, rnn_state = policy(obs, rnn_state, epsilon=exploration.value(t))
         obs, reward, done, _ = env.step(action)
+
         replay_memory.store_effect(action, reward, done)
 
         if done:
