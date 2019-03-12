@@ -31,11 +31,9 @@ class Episode:
         assert not self.finished
         self.finished = True
 
-        self.obs = np.concatenate([obs[None] for obs in self.obs], 0)
+        self.obs = np.stack(self.obs)
         self.action = np.array(self.action)
         self.reward = np.array(self.reward)
-
-        self.refresh()
 
     def refresh(self):
         obs = np.array([self._encode_observation(i) for i in range(self.length)])
@@ -105,6 +103,7 @@ class ReplayMemory:
         self.refresh_func = None
 
         self.episodes = []
+        self.waiting_episodes = []
         self.current_episode = None
 
     def register_refresh_func(self, f):
@@ -152,14 +151,14 @@ class ReplayMemory:
 
     def _move_episode_to_buffer(self):
         self.current_episode.finish()
-
-        while sum([e.length for e in self.episodes]) > self.size:
-            self.episodes.pop(0)
-
-        self.episodes.append(self.current_episode)
+        self.waiting_episodes.append(self.current_episode)
         self.current_episode = self._new_episode()
 
     def refresh(self):
+        self.episodes.extend(self.waiting_episodes)
+        self.waiting_episodes.clear()
+        while sum([e.length for e in self.episodes]) > self.size:
+            self.episodes.pop(0)
         for e in self.episodes:
             e.refresh()
 
