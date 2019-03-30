@@ -4,7 +4,7 @@ import tensorflow as tf
 import dqn
 import utils
 from q_functions import *
-from replay_memory import NStepReplayMemory
+from replay_memory import make_replay_memory
 
 
 def make_continuouscontrol_env(name, seed):
@@ -12,6 +12,7 @@ def make_continuouscontrol_env(name, seed):
     env = gym.wrappers.Monitor(env, 'videos/', force=True, video_callable=lambda e: False)
     env.seed(seed)
     return env
+
 
 def main():
     seed = 0
@@ -30,12 +31,7 @@ def main():
                                outside_value=0.1,
                            )
 
-    replay_memory = NStepReplayMemory(
-                        size=500000,
-                        history_len=1,
-                        discount=0.99,
-                        nsteps=1,
-                    )
+    replay_memory = make_replay_memory(return_type='nstep-1', history_len=1, size=50000, discount=0.99)
 
     dqn.learn(
         env,

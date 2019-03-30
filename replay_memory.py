@@ -2,6 +2,33 @@ import numpy as np
 import random
 
 
+def make_replay_memory(return_type, history_len, size, discount):
+    if 'nstep-' in return_type:
+        n = int( return_type.strip('nstep-') )
+        replay_memory = NStepReplayMemory(size, history_len, discount, nsteps=n)
+
+    elif 'renorm-pengs-' in return_type:
+        lambd = float( return_type.strip('renorm-pengs-') )
+        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=True, use_watkins=False)
+
+    elif 'pengs-' in return_type:
+        lambd = float( return_type.strip('pengs-') )
+        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=False, use_watkins=False)
+
+    elif 'renorm-watkins-' in return_type:
+        lambd = float( return_type.strip('renorm-watkins-') )
+        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=True, use_watkins=True)
+
+    elif 'watkins-' in return_type:
+        lambd = float( return_type.strip('watkins-') )
+        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=False, use_watkins=True)
+
+    else:
+        raise ValueError('Unrecognized return type')
+
+    return replay_memory
+
+
 class Episode:
     def __init__(self, history_len, discount, refresh_func):
         self.finished = False

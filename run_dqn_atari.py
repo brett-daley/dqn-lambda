@@ -6,7 +6,7 @@ import dqn
 import utils
 import wrappers
 from q_functions import *
-from replay_memory import NStepReplayMemory
+from replay_memory import make_replay_memory
 
 
 def make_atari_env(name, seed):
@@ -22,7 +22,7 @@ def make_atari_env(name, seed):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--env',         type=str, default='pong')
-    parser.add_argument('--nsteps',      type=int, default=1)
+    parser.add_argument('--return-type', type=str, default='nstep-1')
     parser.add_argument('--history-len', type=int, default=4)
     parser.add_argument('--seed',        type=int, default=0)
     parser.add_argument('--recurrent',   action='store_true')
@@ -45,12 +45,7 @@ def main():
                                outside_value=0.1,
                            )
 
-    replay_memory = NStepReplayMemory(
-                        size=1000000,
-                        history_len=args.history_len,
-                        discount=0.99,
-                        nsteps=args.nsteps,
-                    )
+    replay_memory = make_replay_memory(args.return_type, args.history_len, size=1000000, discount=0.99)
 
     dqn.learn(
         env,
