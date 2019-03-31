@@ -3,13 +3,14 @@ import tensorflow as tf
 
 import dqn
 import utils
+from wrappers import monitor
 from q_functions import *
 from replay_memory import make_replay_memory
 
 
 def make_continuouscontrol_env(name, seed):
     env = gym.make(name)
-    env = gym.wrappers.Monitor(env, 'videos/', force=True, video_callable=lambda e: False)
+    env = monitor(env, name)
     env.seed(seed)
     return env
 

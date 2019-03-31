@@ -4,17 +4,16 @@ import argparse
 
 import dqn
 import utils
-import wrappers
+from wrappers import monitor, wrap_deepmind
 from q_functions import *
 from replay_memory import make_replay_memory
 
 
 def make_atari_env(name, seed):
-    from gym.wrappers.monitor import Monitor
     from gym.envs.atari.atari_env import AtariEnv
     env = AtariEnv(game=name, frameskip=4, obs_type='image')
-    env = Monitor(env, 'videos/', force=True, video_callable=lambda e: False)
-    env = wrappers.wrap_deepmind(env)
+    env = monitor(env, name)
+    env = wrap_deepmind(env)
     env.seed(seed)
     return env
 
