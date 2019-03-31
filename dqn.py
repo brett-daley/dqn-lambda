@@ -9,7 +9,8 @@ from utils import *
 from wrappers import *
 
 
-def learn(env,
+def learn(session,
+          env,
           benchmark_env,
           QFunction,
           replay_memory,
@@ -22,7 +23,7 @@ def learn(env,
           target_update_freq=10000,
           grad_clip=None,
           log_every_n_steps=100000,
-          mov_avg_size=300,
+          mov_avg_size=500,
     ):
 
     assert (learning_starts % target_update_freq) == 0
@@ -34,8 +35,6 @@ def learn(env,
     benchmark_env = HistoryWrapper(benchmark_env, replay_memory.history_len)
 
     # build model
-    session = get_session()
-
     obs_t_ph  = tf.placeholder(env.observation_space.dtype, [None] + list(input_shape))
     act_t_ph  = tf.placeholder(tf.int32,   [None])
     return_ph = tf.placeholder(tf.float32, [None])

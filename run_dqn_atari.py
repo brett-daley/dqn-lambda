@@ -46,21 +46,23 @@ def main():
 
     replay_memory = make_replay_memory(args.return_type, args.history_len, size=1000000, discount=0.99)
 
-    dqn.learn(
-        env,
-        benchmark_env,
-        AtariRecurrentConvNet if args.recurrent else AtariConvNet,
-        replay_memory,
-        optimizer=optimizer,
-        exploration=exploration_schedule,
-        max_timesteps=n_timesteps,
-        batch_size=32,
-        learning_starts=learning_starts,
-        learning_freq=4,
-        target_update_freq=10000,
-        grad_clip=40.,
-        log_every_n_steps=50000,
-    )
+    with utils.make_session() as session:
+        dqn.learn(
+            session,
+            env,
+            benchmark_env,
+            AtariRecurrentConvNet if args.recurrent else AtariConvNet,
+            replay_memory,
+            optimizer=optimizer,
+            exploration=exploration_schedule,
+            max_timesteps=n_timesteps,
+            batch_size=32,
+            learning_starts=learning_starts,
+            learning_freq=4,
+            target_update_freq=10000,
+            grad_clip=40.,
+            log_every_n_steps=1000,
+        )
     env.close()
 
 
