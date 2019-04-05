@@ -1,0 +1,47 @@
+---
+fig1:
+  num_seeds: 3
+  num_timesteps: 10000000
+  downsample: 80
+  legend: [DQN, DQN($\lambda=0.25$), DQN($\lambda=0.5$), DQN($\lambda=0.75$)]
+  colors: [black, blue, green, red]
+  legend_on_plots: false
+  filenames:
+    - dqn_beam_rider_len1
+    - dqn_breakout_len1
+    - dqn_pong_len1
+    - dqn_qbert_len1
+    - dqn_seaquest_len1
+    - dqn_space_invaders_len1
+  plots:
+    Beam Rider (1-Frame Input):
+      - dqn_beam_rider_len1_nstep-5_seed*.txt
+      - dqn_beam_rider_len1_pengs-0.25_seed*.txt
+      - dqn_beam_rider_len1_pengs-0.5_seed*.txt
+      - dqn_beam_rider_len1_pengs-0.75_seed*.txt
+    Breakout (1-Frame Input):
+      - dqn_breakout_len1_nstep-5_seed*.txt
+      - dqn_breakout_len1_pengs-0.25_seed*.txt
+      - dqn_breakout_len1_pengs-0.5_seed*.txt
+      - dqn_breakout_len1_pengs-0.75_seed*.txt
+    Pong (1-Frame Input):
+      - dqn_pong_len1_nstep-5_seed*.txt
+      - dqn_pong_len1_pengs-0.25_seed*.txt
+      - dqn_pong_len1_pengs-0.5_seed*.txt
+      - dqn_pong_len1_pengs-0.75_seed*.txt
+    Q*Bert (1-Frame Input):
+      - dqn_qbert_len1_nstep-5_seed*.txt
+      - dqn_qbert_len1_pengs-0.25_seed*.txt
+      - dqn_qbert_len1_pengs-0.5_seed*.txt
+      - dqn_qbert_len1_pengs-0.75_seed*.txt
+    Seaquest (1-Frame Input):
+      - dqn_seaquest_len1_nstep-5_seed*.txt
+      - dqn_seaquest_len1_pengs-0.25_seed*.txt
+      - dqn_seaquest_len1_pengs-0.5_seed*.txt
+      - dqn_seaquest_len1_pengs-0.75_seed*.txt
+    Space Invaders (1-Frame Input):
+      - dqn_space_invaders_len1_nstep-5_seed*.txt
+      - dqn_space_invaders_len1_pengs-0.25_seed*.txt
+      - dqn_space_invaders_len1_pengs-0.5_seed*.txt
+      - dqn_space_invaders_len1_pengs-0.75_seed*.txt
+...
