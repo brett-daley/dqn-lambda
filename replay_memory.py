@@ -99,17 +99,19 @@ def calculate_lambda_returns(rewards, qvalues, mask, discount, lambd):
 
 
 def calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, lambd):
+    def k(n):
+        if n == 0:
+            return 1.0
+        return (1.0 - lambd**n) / (1.0 - lambd)
+
     next_qvalues = shifted(qvalues, 1)  # Final state in episode is terminal
     lambda_returns = rewards + (discount * next_qvalues)
-    N = 1
+
+    n = 1
     for i in reversed(range(len(rewards) - 1)):
-        def k(n):
-            if n == 0:
-                return 1.0
-            return sum([lambd**i for i in range(n)])
         l = lambd * mask[i]
-        N = (N * int(mask[i])) + 1
-        lambda_returns[i] = (1. / k(N)) * (lambda_returns[i] + l * k(N-1) * (rewards[i] + discount * lambda_returns[i+1]))
+        n = (n * int(mask[i])) + 1
+        lambda_returns[i] = (1. / k(n)) * (lambda_returns[i] + l * k(n-1) * (rewards[i] + discount * lambda_returns[i+1]))
     return lambda_returns
 
 
