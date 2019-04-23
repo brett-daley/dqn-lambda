@@ -132,11 +132,10 @@ class ReplayMemory:
         return self._encode_sample(idxes)
 
     def encode_recent_observation(self):
-        assert self.current_episode is not None
         if self.current_episode.length > 0:
             return self.current_episode._encode_observation(-1)
         else:
-            return self.episodes[-1]._encode_observation(-1)
+            return self.waiting_episodes[-1]._encode_observation(-1)
 
     def store_frame(self, frame):
         if self.current_episode is None:
