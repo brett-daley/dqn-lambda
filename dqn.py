@@ -44,7 +44,8 @@ def learn(env,
     qvalues = q_func.qvalues
     rnn_state_tf = q_func.rnn_state if q_func.is_recurrent() else None
 
-    greedy_action = tf.argmax(qvalues, axis=1)
+    greedy_actions = tf.argmax(qvalues, axis=1)
+    greedy_qvalues = tf.reduce_max(qvalues, axis=1)
 
     action_indices = tf.stack([tf.range(tf.size(act_t_ph)), act_t_ph], axis=-1)
     onpolicy_qvalues = tf.gather_nd(qvalues, action_indices)
@@ -59,12 +60,12 @@ def learn(env,
     train_op = optimizer.apply_gradients(grads_and_vars)
 
     def refresh(states, actions):
-        onpolicy_qvals, greedy = session.run([onpolicy_qvalues, greedy_action], feed_dict={
+        greedy_qvals, greedy_acts = session.run([greedy_qvalues, greedy_actions], feed_dict={
             obs_t_ph: states,
             act_t_ph: actions,
         })
-        mask = (actions == greedy)
-        return onpolicy_qvals, mask
+        mask = (actions == greedy_acts)
+        return greedy_qvals, mask
 
     replay_memory.register_refresh_func(refresh)
 
@@ -75,7 +76,7 @@ def learn(env,
         if random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            action = session.run(greedy_action, feed_dict={obs_t_ph: obs[None]})[0]
+            action = session.run(greedy_actions, feed_dict={obs_t_ph: obs[None]})[0]
         return action, None
 
     def epsilon_greedy_rnn(obs, rnn_state, epsilon):
@@ -87,7 +88,7 @@ def learn(env,
             action = env.action_space.sample()
             rnn_state = session.run(rnn_state_tf, feed_dict)
         else:
-            action, rnn_state = session.run([greedy_action, rnn_state_tf], feed_dict)
+            action, rnn_state = session.run([greedy_actions, rnn_state_tf], feed_dict)
             action = action[0]
 
         return action, rnn_state
