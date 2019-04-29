@@ -26,6 +26,7 @@ def learn(session,
     ):
 
     assert (learning_starts % target_update_freq) == 0
+    assert (target_update_freq % learning_freq) == 0
     assert type(env.observation_space) == gym.spaces.Box
     assert type(env.action_space)      == gym.spaces.Discrete
 
@@ -49,20 +50,21 @@ def learn(session,
     onpolicy_qvalues = tf.gather_nd(qvalues, action_indices)
 
     td_error = return_ph - onpolicy_qvalues
-    total_error = tf.reduce_mean(tf.square(td_error))
+    loss = tf.reduce_mean(tf.square(td_error))
 
     # compute and clip gradients
-    grads_and_vars = optimizer.compute_gradients(total_error, var_list=tf.trainable_variables())
+    grads_and_vars = optimizer.compute_gradients(loss, var_list=tf.trainable_variables())
     if grad_clip is not None:
         grads_and_vars = [(tf.clip_by_value(g, -grad_clip, +grad_clip), v) for g, v in grads_and_vars]
     train_op = optimizer.apply_gradients(grads_and_vars)
 
     def refresh(states, actions):
+        assert len(states) == len(actions) + 1  # We should have an extra bootstrap state
         greedy_qvals, greedy_acts = session.run([greedy_qvalues, greedy_actions], feed_dict={
             obs_t_ph: states,
             act_t_ph: actions,
         })
-        mask = (actions == greedy_acts)
+        mask = (actions == greedy_acts[:-1])
         return greedy_qvals, mask
 
     replay_memory.register_refresh_func(refresh)
@@ -91,15 +93,29 @@ def learn(session,
 
         return action, rnn_state
 
+    def train():
+        obs_batch, act_batch, ret_batch = replay_memory.sample(batch_size)
+
+        session.run(train_op, feed_dict={
+            obs_t_ph:  obs_batch,
+            act_t_ph:  act_batch,
+            return_ph: ret_batch,
+        })
+
     best_mean_reward = -float('inf')
     obs = env.reset()
     rnn_state = None
     n_epochs = 0
+    num_train_iterations = target_update_freq // learning_freq
+    cache_size = batch_size * num_train_iterations
+
     policy = epsilon_greedy_rnn if q_func.is_recurrent() else epsilon_greedy
     rewards = deque(benchmark(benchmark_env, policy, epsilon=1.0, n_episodes=mov_avg_size), maxlen=mov_avg_size)
     start_time = time.time()
 
     for t in itertools.count():
+        train_frac = max(0.0, (t - learning_starts) / (max_timesteps - learning_starts))
+
         if t % log_every_n_steps == 0:
             print('Epoch', n_epochs)
             print('Timestep', t)
@@ -112,6 +128,7 @@ def learn(session,
 
             print('Episodes', len(get_episode_rewards(env)))
             print('Exploration', exploration.value(t))
+            print('Priority', replay_memory.priority_now(train_frac))
             print('Mean reward', mean_reward)
             print('Best mean reward', best_mean_reward)
             print('Standard dev', std_reward)
@@ -122,7 +139,7 @@ def learn(session,
         if t >= max_timesteps:
             break
 
-        replay_memory.store_frame(obs)
+        replay_memory.store_obs(obs)
         obs = replay_memory.encode_recent_observation()
 
         action, rnn_state = policy(obs, rnn_state, epsilon=exploration.value(t))
@@ -136,13 +153,7 @@ def learn(session,
 
         if t >= learning_starts:
             if t % target_update_freq == 0:
-                replay_memory.refresh()
+                replay_memory.refresh(cache_size, train_frac)
 
-            if t % learning_freq == 0:
-                obs_batch, act_batch, ret_batch = replay_memory.sample(batch_size)
-
-                session.run(train_op, feed_dict={
-                    obs_t_ph:  obs_batch,
-                    act_t_ph:  act_batch,
-                    return_ph: ret_batch,
-                })
+                for _ in range(num_train_iterations):
+                    train()

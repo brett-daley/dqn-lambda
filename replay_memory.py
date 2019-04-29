@@ -4,7 +4,7 @@ import numpy as np
 def make_replay_memory(return_type, history_len, size, discount):
     if 'nstep-' in return_type:
         n = int( return_type.strip('nstep-') )
-        replay_memory = NStepReplayMemory(size, history_len, discount, nsteps=n)
+        replay_memory = NStepReplayMemory(size, history_len, discount, n)
 
     elif 'renorm-pengs-' in return_type:
         lambd = float( return_type.strip('renorm-pengs-') )
@@ -28,82 +28,34 @@ def make_replay_memory(return_type, history_len, size, discount):
     return replay_memory
 
 
-class Episode:
-    def __init__(self, history_len, discount, refresh_func):
-        self.finished = False
-        self.history_len = history_len
-
-        self.discount = discount
-        self.refresh_func = refresh_func
-
-        self.obs     = []
-        self.action  = []
-        self.reward  = []
-        self.returns = None
-
-        self.length = 0
-
-    def store_frame(self, obs):
-        self.obs.append(obs)
-        self.length += 1
-
-    def store_effect(self, action, reward):
-        self.action.append(action)
-        self.reward.append(reward)
-
-    def finish(self):
-        assert not self.finished
-        self.finished = True
-
-        self.obs = np.stack(self.obs)
-        self.action = np.array(self.action)
-        self.reward = np.array(self.reward)
-
-    def refresh(self):
-        obs = np.array([self._encode_observation(i) for i in range(self.length)])
-        qvalues, mask = self.refresh_func(obs, self.action)
-        self.returns = self._calculate_returns(self.reward, qvalues, mask, self.discount)
-
-    def _calculate_returns(self, rewards, qvalues, mask, discount):
-        raise NotImplementedError
-
-    def sample(self):
-        i = np.random.randint(self.length)
-        return (self._encode_observation(i), self.action[i], self.returns[i])
-
-    def _encode_observation(self, idx):
-        end = (idx % self.length) + 1 # make noninclusive
-        start = end - self.history_len
-
-        pad_len = max(0, -start)
-        padding = [np.zeros_like(self.obs[0]) for _ in range(pad_len)]
-
-        start = max(0, start)
-        obs = [x for x in self.obs[start:end]]
-
-        return np.array(padding + obs)
+def pad_axis0(array, value):
+    return np.pad(array, pad_width=(0,1), mode='constant', constant_values=value)
 
 
-def shifted(array, k):
-    '''Shifts array left by k elements and pads with zeros'''
-    return np.pad(array, (0, k), mode='constant')[k:]
+def shift(array):
+        return pad_axis0(array, 0)[1:]
 
 
-def calculate_lambda_returns(rewards, qvalues, mask, discount, lambd):
-    next_qvalues = shifted(qvalues, 1)  # Final state in episode is terminal
-    lambda_returns = rewards + (discount * next_qvalues)
+def calculate_lambda_returns(rewards, qvalues, dones, mask, discount, lambd):
+    dones = dones.astype(np.float32)
+    qvalues[-1] *= (1.0 - dones[-1])
+    lambda_returns = rewards + (discount * qvalues[1:])
     for i in reversed(range(len(rewards) - 1)):
-        lambda_returns[i] += (discount * lambd * mask[i]) * (lambda_returns[i+1] - next_qvalues[i])
+        a = lambda_returns[i] + (discount * lambd * mask[i]) * (lambda_returns[i+1] - qvalues[i+1])
+        b = rewards[i]
+        lambda_returns[i] = (1.0 - dones[i]) * a + dones[i] * b
     return lambda_returns
 
 
 def calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, lambd):
+    raise NotImplementedError
+
     def k(n):
         if n == 0:
             return 1.0
         return (1.0 - lambd**n) / (1.0 - lambd)
 
-    next_qvalues = shifted(qvalues, 1)  # Final state in episode is terminal
+    next_qvalues = shift(qvalues)  # Final state in episode is terminal
     lambda_returns = rewards + (discount * next_qvalues)
 
     n = 1
@@ -114,35 +66,29 @@ def calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, lamb
     return lambda_returns
 
 
-def calculate_nstep_returns(rewards, qvalues, discount, nsteps):
-    mask = np.ones_like(qvalues)
-    mc_returns = calculate_lambda_returns(rewards, qvalues, mask, discount, lambd=1.0)
-    nstep_returns = mc_returns - (discount ** nsteps) * (shifted(mc_returns, nsteps) - shifted(qvalues, nsteps))
-    return nstep_returns
+def calculate_nstep_returns(rewards, qvalues, dones, discount, n):
+    # Counterintuitively, the bootstrap is treated is as a reward too
+    rewards = pad_axis0(rewards, qvalues[-1])
+    dones   = pad_axis0(dones, 1.0)
 
+    mask    = np.ones_like(rewards)
+    decay   = 1.0
+    returns = np.copy(rewards)
 
-class LambdaEpisode(Episode):
-    def __init__(self, history_len, discount, Lambda, renormalize, use_watkins, refresh_func):
-        self.Lambda = Lambda
-        self.renormalize = renormalize
-        self.use_watkins = use_watkins
-        super().__init__(history_len, discount, refresh_func)
+    for i in range(n):
+        decay *= discount
+        mask *= (1.0 - dones)
 
-    def _calculate_returns(self, rewards, qvalues, mask, discount):
-        if not self.use_watkins:
-            mask = np.ones_like(qvalues)
-        if self.renormalize:
-            return calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, self.Lambda)
-        return calculate_lambda_returns(rewards, qvalues, mask, discount, self.Lambda)
+        rewards = shift(rewards)
+        qvalues = shift(qvalues)
+        dones   = shift(dones)
 
+        if i != (n-1):
+            returns += (mask * decay * rewards)
+        else:
+            returns += (mask * decay * qvalues)
 
-class NStepEpisode(Episode):
-    def __init__(self, history_len, discount, nsteps, refresh_func):
-        self.nsteps = nsteps
-        super().__init__(history_len, discount, refresh_func)
-
-    def _calculate_returns(self, rewards, qvalues, mask, discount):
-        return calculate_nstep_returns(rewards, qvalues, discount, self.nsteps)
+    return returns[:-1]  # Remove bootstrap placeholder
 
 
 class ReplayMemory:
@@ -151,86 +97,161 @@ class ReplayMemory:
         self.history_len = history_len
         self.discount = discount
 
+        self.oversample = 1.0
+        self.prioritize = 0.0
+        self.chunk_size = 100
+
         self.refresh_func = None
 
-        self.episodes = []
-        self.waiting_episodes = []
-        self.current_episode = None
+        self.obs     = []
+        self.actions = []
+        self.rewards = []
+        self.dones   = []
 
     def register_refresh_func(self, f):
+        assert self.refresh_func is None
         self.refresh_func = f
 
-    def can_sample(self):
-        return len(self.episodes) > 0
-
-    def _encode_sample(self, idxes):
-        samples = [self.episodes[i].sample() for i in idxes]
-        obs_batch, act_batch, rew_batch = zip(*samples)
-
-        return np.array(obs_batch), np.array(act_batch), np.array(rew_batch)
+    def config_cache(self, oversample, priority, chunk_size):
+        assert oversample >= 1.0
+        assert 0.0 <= priority <= 1.0
+        assert isinstance(chunk_size, int) and chunk_size >= 1
+        if oversample == 1.0 and priority > 0.0:
+            raise ValueError("Can't prioritize when oversampling ratio is 1.0")
+        self.oversample = oversample
+        self.priority = priority
+        self.chunk_size = chunk_size
 
     def sample(self, batch_size):
-        assert self.can_sample()
+        start = self.batch_counter * batch_size
+        end = start + batch_size
+        indices = self.indices[start:end]
 
-        lengths = np.array([e.length for e in self.episodes])
-        bias_correction = lengths / np.sum(lengths)
+        obs_batch = self.cached_obs[indices]
+        act_batch = self.cached_actions[indices]
+        ret_batch = self.cached_returns[indices]
 
-        idxes = np.random.choice(
-            a=np.arange(len(self.episodes)),
-            size=batch_size,
-            p=bias_correction,
-        )
-        return self._encode_sample(idxes)
+        self.batch_counter += 1
+
+        return np.array(obs_batch), np.array(act_batch), np.array(ret_batch)
 
     def encode_recent_observation(self):
-        if self.current_episode.length > 0:
-            return self.current_episode._encode_observation(-1)
-        else:
-            return self.waiting_episodes[-1]._encode_observation(-1)
+        i = self.len() - 1
+        return self._encode_observation(i)
 
-    def store_frame(self, frame):
-        if self.current_episode is None:
-            self.current_episode = self._new_episode()
-        self.current_episode.store_frame(frame)
+    def _encode_observation(self, i):
+        end = i + 1  # Make non-inclusive
+        start = end - self.history_len
+
+        pad_len = max(0, -start)
+        padding = [np.zeros_like(self.obs[0]) for _ in range(pad_len)]
+
+        start = max(0, start)
+        obs = self.obs[start:end]
+
+        return np.array(padding + obs)
+
+    def store_obs(self, obs):
+        self.obs.append(obs)
 
     def store_effect(self, action, reward, done):
-        self.current_episode.store_effect(action, reward)
+        self.actions.append(action)
+        self.rewards.append(reward)
+        self.dones.append(done)
 
-        if done:
-            self._move_episode_to_buffer()
+        if self.len() > self.size:
+            self.obs.pop(0)
+            self.actions.pop(0)
+            self.rewards.pop(0)
+            self.dones.pop(0)
 
-    def _move_episode_to_buffer(self):
-        self.current_episode.finish()
-        self.waiting_episodes.append(self.current_episode)
-        self.current_episode = self._new_episode()
+        assert len(self.obs) == len(self.actions) == len(self.rewards) == len(self.dones)
 
-    def refresh(self):
-        self.episodes.extend(self.waiting_episodes)
-        self.waiting_episodes.clear()
-        while sum([e.length for e in self.episodes]) > self.size:
-            self.episodes.pop(0)
-        for e in self.episodes:
-            e.refresh()
+    def len(self):
+        return len(self.obs)
 
-    def _new_episode(self):
+    def refresh(self, cache_size, train_frac):
+        # Reset batch counter
+        self.batch_counter = 0
+
+        # Sample chunks until we have enough data
+        num_chunks = int(self.oversample * cache_size) // self.chunk_size
+        chunk_ids = np.random.randint(self.chunk_size, self.len() - 1, size=num_chunks)  # TODO: this creates bias
+
+        self._refresh(cache_size, train_frac, chunk_ids)  # Separate function for unit testing
+
+    def _refresh(self, cache_size, train_frac, chunk_ids):
+        # Refresh the chunks we sampled
+        obs_chunks = [self._extract_chunk(self.obs, i, obs=True) for i in chunk_ids]
+        action_chunks = [self._extract_chunk(self.actions, i) for i in chunk_ids]
+        reward_chunks = [self._extract_chunk(self.rewards, i) for i in chunk_ids]
+        done_chunks = [self._extract_chunk(self.dones, i) for i in chunk_ids]
+
+        return_chunks = []
+        error_chunks = []
+        for obs, actions, rewards, dones in zip(obs_chunks, action_chunks, reward_chunks, done_chunks):
+            qvalues, mask = self.refresh_func(obs, actions)
+
+            returns = self._calculate_returns(rewards, qvalues, dones, mask)
+            return_chunks.append(returns)
+
+            one_step_returns = calculate_nstep_returns(rewards, qvalues, dones, self.discount, n=1)
+            errors = np.abs(one_step_returns - qvalues[:-1])
+            error_chunks.append(errors)
+
+        # Collect and store data
+        self.cached_obs = np.concatenate([c[:-1] for c in obs_chunks])
+        self.cached_actions = np.concatenate([c for c in action_chunks])
+        self.cached_returns = np.concatenate([c for c in return_chunks])
+
+        self.indices = np.arange(len(self.cached_returns))
+        np.random.shuffle(self.indices)
+
+        if self.priority > 0.0:
+            cached_errors = np.concatenate([c for c in error_chunks])
+            sort = np.argsort(cached_errors)[::-1]
+            prioritized = self.indices[sort]
+
+            p = self.priority_now(train_frac)
+            b = np.random.choice([0, 1], size=self.indices.shape, p=[1-p, p])
+            self.indices[b == 1] = prioritized[b == 1]
+
+        self.indices = self.indices[:cache_size]
+        np.random.shuffle(self.indices)
+
+    def _extract_chunk(self, list, end, obs=False):
+        end += 1  # Make non-inclusive
+        start = end - self.chunk_size
+        if obs:
+            return np.array([self._encode_observation(i) for i in range(start, end + 1)])
+        return np.array(list[start:end])
+
+    def priority_now(self, train_frac):
+        return self.priority * (1.0 - train_frac)
+
+    def _calculate_returns(self, rewards, qvalues, dones, mask):
         raise NotImplementedError
 
 
 class LambdaReplayMemory(ReplayMemory):
-    def __init__(self, size, history_len, discount, Lambda, renormalize, use_watkins):
-        self.Lambda = Lambda
+    def __init__(self, size, history_len, discount, lambd, renormalize, use_watkins):
+        self.lambd = lambd
         self.renormalize = renormalize
         self.use_watkins = use_watkins
         super().__init__(size, history_len, discount)
 
-    def _new_episode(self):
-        return LambdaEpisode(self.history_len, self.discount, self.Lambda, self.renormalize, self.use_watkins, self.refresh_func)
+    def _calculate_returns(self, rewards, qvalues, dones, mask):
+        if not self.use_watkins:
+            mask = np.ones_like(qvalues)
+        if self.renormalize:
+            return calculate_renormalized_lambda_returns(rewards, qvalues, mask, self.discount, self.lambd)
+        return calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, self.lambd)
 
 
 class NStepReplayMemory(ReplayMemory):
-    def __init__(self, size, history_len, discount, nsteps):
-        self.nsteps = nsteps
+    def __init__(self, size, history_len, discount, n):
+        self.n = n
         super().__init__(size, history_len, discount)
 
-    def _new_episode(self):
-        return NStepEpisode(self.history_len, self.discount, self.nsteps, self.refresh_func)
+    def _calculate_returns(self, rewards, qvalues, dones, mask):
+        return calculate_nstep_returns(rewards, qvalues, dones, self.discount, self.n)

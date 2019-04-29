@@ -23,6 +23,9 @@ def get_args():
     parser.add_argument('--env',         type=str, default='pong')
     parser.add_argument('--return-type', type=str, default='nstep-1')
     parser.add_argument('--history-len', type=int, default=4)
+    parser.add_argument('--oversample',  type=float, default=1.0)
+    parser.add_argument('--priority',    type=float, default=0.0)
+    parser.add_argument('--chunk-size',  type=int, default=100)
     parser.add_argument('--seed',        type=int, default=0)
     parser.add_argument('--recurrent',   action='store_true')
     return parser.parse_args()
@@ -44,6 +47,7 @@ def main():
                            )
 
     replay_memory = make_replay_memory(args.return_type, args.history_len, size=1000000, discount=0.99)
+    replay_memory.config_cache(args.oversample, args.priority, args.chunk_size)
 
     with utils.make_session(args.seed) as session:
         dqn.learn(
