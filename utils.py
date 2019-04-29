@@ -4,6 +4,7 @@ import gym
 import tensorflow as tf
 import numpy as np
 import random
+from subprocess import check_output
 
 
 def benchmark(env, policy, epsilon, n_episodes):
@@ -27,9 +28,12 @@ def get_episode_rewards(env):
 
 
 def get_available_gpus():
-    from tensorflow.python.client import device_lib
-    local_device_protos = device_lib.list_local_devices()
-    return [x.physical_device_desc for x in local_device_protos if x.device_type == 'GPU']
+    # Calling nvidia-smi does not allocate memory on the GPUs
+    try:
+        output = check_output(['nvidia-smi', '-L']).decode()
+        return [gpu for gpu in output.split('\n') if 'UUID' in gpu]
+    except FileNotFoundError:
+        return []
 
 
 def set_global_seeds(i):
@@ -43,14 +47,12 @@ def set_global_seeds(i):
     random.seed(i)
 
 
-def get_session():
+def make_session():
+    print('AVAILABLE GPUS:', get_available_gpus(), flush=True)
     tf.reset_default_graph()
-    tf_config = tf.ConfigProto(
-                    inter_op_parallelism_threads=1,
-                    intra_op_parallelism_threads=1,
-                )
-    session = tf.Session(config=tf_config)
-    print('AVAILABLE GPUS: ', get_available_gpus())
+    gpu_options = tf.GPUOptions(allow_growth=True)
+    config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1, gpu_options=gpu_options)
+    session = tf.Session(config=config)
     return session
 
 

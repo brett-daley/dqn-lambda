@@ -2,14 +2,39 @@ import numpy as np
 import random
 
 
+def make_replay_memory(return_type, history_len, size, discount):
+    if 'nstep-' in return_type:
+        n = int( return_type.strip('nstep-') )
+        replay_memory = NStepReplayMemory(size, history_len, discount, nsteps=n)
+
+    elif 'renorm-pengs-' in return_type:
+        lambd = float( return_type.strip('renorm-pengs-') )
+        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=True, use_watkins=False)
+
+    elif 'pengs-' in return_type:
+        lambd = float( return_type.strip('pengs-') )
+        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=False, use_watkins=False)
+
+    elif 'renorm-watkins-' in return_type:
+        lambd = float( return_type.strip('renorm-watkins-') )
+        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=True, use_watkins=True)
+
+    elif 'watkins-' in return_type:
+        lambd = float( return_type.strip('watkins-') )
+        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=False, use_watkins=True)
+
+    else:
+        raise ValueError('Unrecognized return type')
+
+    return replay_memory
+
+
 class Episode:
-    def __init__(self, history_len, discount, Lambda, refresh_func):
+    def __init__(self, history_len, discount, refresh_func):
         self.finished = False
         self.history_len = history_len
 
         self.discount = discount
-        self.Lambda = Lambda
-
         self.refresh_func = refresh_func
 
         self.obs     = []
@@ -38,9 +63,9 @@ class Episode:
     def refresh(self):
         obs = np.array([self._encode_observation(i) for i in range(self.length)])
         qvalues, mask = self.refresh_func(obs, self.action)
-        self.returns = self._calc_returns(qvalues, mask)
+        self.returns = self._calculate_returns(self.reward, qvalues, mask, self.discount)
 
-    def _calc_returns(self, qvalues, mask):
+    def _calculate_returns(self, rewards, qvalues, mask, discount):
         raise NotImplementedError
 
     def sample(self):
@@ -65,33 +90,60 @@ def shifted(array, k):
     return np.pad(array, (0, k), mode='constant')[k:]
 
 
+def calculate_lambda_returns(rewards, qvalues, mask, discount, lambd):
+    next_qvalues = shifted(qvalues, 1)  # Final state in episode is terminal
+    lambda_returns = rewards + (discount * next_qvalues)
+    for i in reversed(range(len(rewards) - 1)):
+        lambda_returns[i] += (discount * lambd * mask[i]) * (lambda_returns[i+1] - next_qvalues[i])
+    return lambda_returns
+
+
+def calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, lambd):
+    def k(n):
+        if n == 0:
+            return 1.0
+        return (1.0 - lambd**n) / (1.0 - lambd)
+
+    next_qvalues = shifted(qvalues, 1)  # Final state in episode is terminal
+    lambda_returns = rewards + (discount * next_qvalues)
+
+    n = 1
+    for i in reversed(range(len(rewards) - 1)):
+        l = lambd * mask[i]
+        n = (n * int(mask[i])) + 1
+        lambda_returns[i] = (1. / k(n)) * (lambda_returns[i] + l * k(n-1) * (rewards[i] + discount * lambda_returns[i+1]))
+    return lambda_returns
+
+
+def calculate_nstep_returns(rewards, qvalues, discount, nsteps):
+    mask = np.ones_like(qvalues)
+    mc_returns = calculate_lambda_returns(rewards, qvalues, mask, discount, lambd=1.0)
+    nstep_returns = mc_returns - (discount ** nsteps) * (shifted(mc_returns, nsteps) - shifted(qvalues, nsteps))
+    return nstep_returns
+
+
 class LambdaEpisode(Episode):
-    def _calc_returns(self, qvalues, mask):
-        return self._calc_lambda_returns(qvalues, mask)
+    def __init__(self, history_len, discount, Lambda, renormalize, use_watkins, refresh_func):
+        self.Lambda = Lambda
+        self.renormalize = renormalize
+        self.use_watkins = use_watkins
+        super().__init__(history_len, discount, refresh_func)
 
-    def _calc_lambda_returns(self, qvalues, mask):
-        next_qvalues = shifted(qvalues, 1)  # Final state in episode is terminal
-        lambda_returns = self.reward + (self.discount * next_qvalues)
-        for i in reversed(range(self.length - 1)):
-            lambda_returns[i] += (self.discount * self.Lambda * mask[i]) * (lambda_returns[i+1] - next_qvalues[i])
-        return lambda_returns
+    def _calculate_returns(self, rewards, qvalues, mask, discount):
+        if not self.use_watkins:
+            mask = np.ones_like(qvalues)
+        if self.renormalize:
+            return calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, self.Lambda)
+        return calculate_lambda_returns(rewards, qvalues, mask, discount, self.Lambda)
 
 
-class NStepEpisode(LambdaEpisode):
+class NStepEpisode(Episode):
     def __init__(self, history_len, discount, nsteps, refresh_func):
         self.nsteps = nsteps
-        Lambda = 1.0
-        super().__init__(history_len, discount, Lambda, refresh_func)
+        super().__init__(history_len, discount, refresh_func)
 
-    def _calc_returns(self, qvalues, mask):
-        return self._calc_nstep_returns(qvalues, mask)
-
-    def _calc_nstep_returns(self, qvalues, mask):
-        mask = np.ones_like(mask)
-        mc_returns = self._calc_lambda_returns(qvalues, mask)
-        n = self.nsteps
-        nstep_returns = mc_returns - (self.discount ** n) * (shifted(mc_returns, n) - shifted(qvalues, n))
-        return nstep_returns
+    def _calculate_returns(self, rewards, qvalues, mask, discount):
+        return calculate_nstep_returns(rewards, qvalues, discount, self.nsteps)
 
 
 class ReplayMemory:
@@ -166,12 +218,14 @@ class ReplayMemory:
 
 
 class LambdaReplayMemory(ReplayMemory):
-    def __init__(self, size, history_len, discount, Lambda):
+    def __init__(self, size, history_len, discount, Lambda, renormalize, use_watkins):
         self.Lambda = Lambda
+        self.renormalize = renormalize
+        self.use_watkins = use_watkins
         super().__init__(size, history_len, discount)
 
     def _new_episode(self):
-        return LambdaEpisode(self.history_len, self.discount, self.Lambda, self.refresh_func)
+        return LambdaEpisode(self.history_len, self.discount, self.Lambda, self.renormalize, self.use_watkins, self.refresh_func)
 
 
 class NStepReplayMemory(ReplayMemory):

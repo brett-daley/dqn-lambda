@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 from collections import deque
 import gym
-from gym import spaces
+from gym.wrappers import Monitor
+from datetime import datetime
+import os
 
 
 class HistoryWrapper(gym.Wrapper):
@@ -113,7 +115,7 @@ class EpisodicLifeEnv(gym.Wrapper):
 class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.observation_space = spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
 
     def observation(self, observation):
         observation = cv2.cvtColor(observation, cv2.COLOR_BGR2GRAY)
@@ -123,6 +125,15 @@ class ProcessFrame84(gym.ObservationWrapper):
 class ClippedRewardsWrapper(gym.RewardWrapper):
     def reward(self, reward):
         return np.sign(reward)
+
+def monitor(env, name, video=False):
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')
+    monitor_dir = os.path.join('/tmp/', name + '_' + timestamp)
+    print('Logging to', monitor_dir)
+    env = Monitor(env, directory=monitor_dir)
+    if not video:
+        env.video_callable = lambda e: False
+    return env
 
 def wrap_deepmind_ram(env):
     if 'FIRE' in env.unwrapped.get_action_meanings():

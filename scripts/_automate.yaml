@@ -1,0 +1,54 @@
+---
+exp1:
+  n_seeds: 3
+  env:
+    - beam_rider
+    - breakout
+    - pong
+    - qbert
+    - seaquest
+    - space_invaders
+  history_len: [1]
+  recurrent: false
+  return_type:
+    - nstep-5
+    - pengs-0.25
+    - pengs-0.5
+    - pengs-0.75
+
+exp2a:
+  n_seeds: 3
+  env:
+    - breakout
+    - space_invaders
+  history_len: [1]
+  recurrent: false
+  return_type:
+    - renorm-pengs-0.25
+    - watkins-0.25
+    - renorm-watkins-0.25
+
+exp2b:
+  n_seeds: 3
+  env:
+    - beam_rider
+    - seaquest
+  history_len: [1]
+  recurrent: false
+  return_type:
+    - renorm-pengs-0.5
+    - watkins-0.5
+    - renorm-watkins-0.5
+
+exp2c:
+  n_seeds: 3
+  env:
+    - pong
+    - qbert
+  history_len: [1]
+  recurrent: false
+  return_type:
+    - renorm-pengs-0.75
+    - watkins-0.75
+    - renorm-watkins-0.75
+...
