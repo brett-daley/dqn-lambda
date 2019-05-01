@@ -30,7 +30,6 @@ def get_args():
 
 def main():
     args = get_args()
-    utils.set_global_seeds(args.seed)
 
     env = make_atari_env(args.env, args.seed)
     benchmark_env = make_atari_env(args.env, args.seed+1)
@@ -46,7 +45,7 @@ def main():
 
     replay_memory = make_replay_memory(args.return_type, args.history_len, size=1000000, discount=0.99)
 
-    with utils.make_session() as session:
+    with utils.make_session(args.seed) as session:
         dqn.learn(
             session,
             env,

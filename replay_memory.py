@@ -1,5 +1,4 @@
 import numpy as np
-import random
 
 
 def make_replay_memory(return_type, history_len, size, discount):
@@ -69,7 +68,7 @@ class Episode:
         raise NotImplementedError
 
     def sample(self):
-        i = random.randrange(self.length)
+        i = np.random.randint(self.length)
         return (self._encode_observation(i), self.action[i], self.returns[i])
 
     def _encode_observation(self, idx):

@@ -17,8 +17,6 @@ def make_continuouscontrol_env(name, seed):
 
 def main():
     seed = 0
-    utils.set_global_seeds(seed)
-
     name = 'CartPole-v0'
     env = make_continuouscontrol_env(name, seed)
     benchmark_env = make_continuouscontrol_env(name, seed+1)
@@ -34,7 +32,7 @@ def main():
 
     replay_memory = make_replay_memory(return_type='nstep-1', history_len=1, size=50000, discount=0.99)
 
-    with utils.make_session() as session:
+    with utils.make_session(seed) as session:
         dqn.learn(
             session,
             env,

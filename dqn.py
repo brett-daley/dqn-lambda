@@ -1,7 +1,6 @@
 import gym
 import itertools
 import numpy as np
-import random
 import tensorflow as tf
 import time
 
@@ -72,7 +71,7 @@ def learn(session,
     session.run(tf.global_variables_initializer())
 
     def epsilon_greedy(obs, rnn_state, epsilon):
-        if random.random() < epsilon:
+        if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
             action = session.run(greedy_actions, feed_dict={obs_t_ph: obs[None]})[0]
@@ -83,7 +82,7 @@ def learn(session,
         if rnn_state is not None:
             feed_dict[q_func.rnn_state] = rnn_state
 
-        if random.random() < epsilon:
+        if np.random.rand() < epsilon:
             action = env.action_space.sample()
             rnn_state = session.run(rnn_state_tf, feed_dict)
         else:

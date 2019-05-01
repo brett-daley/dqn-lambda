@@ -3,7 +3,6 @@ implementing DQN."""
 import gym
 import tensorflow as tf
 import numpy as np
-import random
 from subprocess import check_output
 
 
@@ -36,23 +35,16 @@ def get_available_gpus():
         return []
 
 
-def set_global_seeds(i):
-    try:
-        import tensorflow as tf
-    except ImportError:
-        pass
-    else:
-        tf.set_random_seed(i)
-    np.random.seed(i)
-    random.seed(i)
-
-
-def make_session():
+def make_session(seed):
     print('AVAILABLE GPUS:', get_available_gpus(), flush=True)
     tf.reset_default_graph()
     gpu_options = tf.GPUOptions(allow_growth=True)
     config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1, gpu_options=gpu_options)
     session = tf.Session(config=config)
+
+    np.random.seed(seed)
+    tf.set_random_seed(seed)  # Must be called after graph creation or results will be non-deterministic
+
     return session
 
 
