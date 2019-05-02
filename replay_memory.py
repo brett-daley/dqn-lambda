@@ -176,7 +176,7 @@ class ReplayMemory:
 
         # Sample chunks until we have enough data
         num_chunks = int(self.oversample * cache_size) // self.chunk_size
-        chunk_ids = np.random.randint(self.chunk_size, self.len() - 1, size=num_chunks)  # TODO: this creates bias
+        chunk_ids = self._sample_chunk_ids(num_chunks)
 
         self._refresh(cache_size, train_frac, chunk_ids)  # Separate function for unit testing
 
@@ -218,6 +218,9 @@ class ReplayMemory:
 
         self.indices = self.indices[:cache_size]
         np.random.shuffle(self.indices)
+
+    def _sample_chunk_ids(self, n):
+        return np.random.randint(self.chunk_size, self.len() - 1, size=n)
 
     def _extract_chunk(self, list, end, obs=False):
         end += 1  # Make non-inclusive

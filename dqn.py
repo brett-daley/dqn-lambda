@@ -6,6 +6,7 @@ import time
 
 from utils import *
 from wrappers import *
+from replay_memory_legacy import LegacyReplayMemory
 
 
 def learn(session,
@@ -34,12 +35,14 @@ def learn(session,
     n_actions = env.action_space.n
     benchmark_env = HistoryWrapper(benchmark_env, replay_memory.history_len)
 
+    legacy_mode = isinstance(replay_memory, LegacyReplayMemory)
+
     # build model
     obs_t_ph  = tf.placeholder(env.observation_space.dtype, [None] + list(input_shape))
     act_t_ph  = tf.placeholder(tf.int32,   [None])
     return_ph = tf.placeholder(tf.float32, [None])
 
-    q_func = QFunction(obs_t_ph, n_actions, scope='q_func')
+    q_func = QFunction(obs_t_ph, n_actions, scope='main')
     qvalues = q_func.qvalues
     rnn_state_tf = q_func.rnn_state if q_func.is_recurrent() else None
 
@@ -52,20 +55,24 @@ def learn(session,
     td_error = return_ph - onpolicy_qvalues
     loss = tf.reduce_mean(tf.square(td_error))
 
-    # compute and clip gradients
-    grads_and_vars = optimizer.compute_gradients(loss, var_list=tf.trainable_variables())
-    if grad_clip is not None:
-        grads_and_vars = [(tf.clip_by_value(g, -grad_clip, +grad_clip), v) for g, v in grads_and_vars]
-    train_op = optimizer.apply_gradients(grads_and_vars)
+    if not legacy_mode:
+        def refresh(states, actions):
+            assert len(states) == len(actions) + 1  # We should have an extra bootstrap state
+            greedy_qvals, greedy_acts = session.run([greedy_qvalues, greedy_actions], feed_dict={
+                obs_t_ph: states,
+                act_t_ph: actions,
+            })
+            mask = (actions == greedy_acts[:-1])
+            return greedy_qvals, mask
+    else:
+        max_target_qvalues = tf.reduce_max(QFunction(obs_t_ph, n_actions, scope='target').qvalues, axis=1)
+        target_update_op = create_copy_op(src_scope='main', dst_scope='target')
 
-    def refresh(states, actions):
-        assert len(states) == len(actions) + 1  # We should have an extra bootstrap state
-        greedy_qvals, greedy_acts = session.run([greedy_qvalues, greedy_actions], feed_dict={
-            obs_t_ph: states,
-            act_t_ph: actions,
-        })
-        mask = (actions == greedy_acts[:-1])
-        return greedy_qvals, mask
+        def refresh(states):
+            return session.run(max_target_qvalues, feed_dict={obs_t_ph: states})
+
+    main_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='main')
+    train_op = minimize_with_grad_clipping(optimizer, loss, main_vars, grad_clip)
 
     replay_memory.register_refresh_func(refresh)
 
@@ -106,8 +113,6 @@ def learn(session,
     obs = env.reset()
     rnn_state = None
     n_epochs = 0
-    num_train_iterations = target_update_freq // learning_freq
-    cache_size = batch_size * num_train_iterations
 
     policy = epsilon_greedy_rnn if q_func.is_recurrent() else epsilon_greedy
     rewards = deque(benchmark(benchmark_env, policy, epsilon=1.0, n_episodes=mov_avg_size), maxlen=mov_avg_size)
@@ -128,7 +133,8 @@ def learn(session,
 
             print('Episodes', len(get_episode_rewards(env)))
             print('Exploration', exploration.value(t))
-            print('Priority', replay_memory.priority_now(train_frac))
+            if not legacy_mode:
+                print('Priority', replay_memory.priority_now(train_frac))
             print('Mean reward', mean_reward)
             print('Best mean reward', best_mean_reward)
             print('Standard dev', std_reward)
@@ -152,8 +158,18 @@ def learn(session,
             rnn_state = None
 
         if t >= learning_starts:
-            if t % target_update_freq == 0:
-                replay_memory.refresh(cache_size, train_frac)
+            if not legacy_mode:
+                if t % target_update_freq == 0:
+                    num_train_iterations = target_update_freq // learning_freq
+                    cache_size = batch_size * num_train_iterations
 
-                for _ in range(num_train_iterations):
+                    replay_memory.refresh(cache_size, train_frac)
+
+                    for _ in range(num_train_iterations):
+                        train()
+            else:
+                if t % target_update_freq == 0:
+                    session.run(target_update_op)
+
+                if t % learning_freq == 0:
                     train()

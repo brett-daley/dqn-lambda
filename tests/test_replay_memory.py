@@ -3,7 +3,7 @@ import numpy as np
 from replay_memory import NStepReplayMemory, LambdaReplayMemory
 
 
-class TestCaseReturns(unittest.TestCase):
+class TestCaseCore(unittest.TestCase):
     def setUp(self):
         np.random.seed(0)
         self.transitions = [
@@ -37,13 +37,18 @@ class TestCaseReturns(unittest.TestCase):
             replay_memory.store_obs(state)
             state = replay_memory.encode_recent_observation()
             replay_memory.store_effect(action, reward, done)
-        replay_memory._refresh(cache_size=9, train_frac=0.0, chunk_ids=[2, 5, 8])
 
     def assertNumpyEqual(self, x, y):
         f = lambda a: np.array(a).reshape(-1)
         x, y = map(f, [x, y])
         self.assertEqual(x.dtype, y.dtype)
         self.assertTrue(np.allclose(x - y, 0.0))
+
+
+class TestCaseReplayMemory(TestCaseCore):
+    def fill(self, replay_memory):
+        super().fill(replay_memory)
+        replay_memory._refresh(cache_size=9, train_frac=0.0, chunk_ids=[2, 5, 8])
 
     def test_1step(self):
         m = NStepReplayMemory(size=20, history_len=1, discount=0.9, n=1)

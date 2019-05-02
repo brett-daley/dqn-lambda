@@ -1,4 +1,3 @@
-import gym
 import tensorflow as tf
 import argparse
 
@@ -6,7 +5,6 @@ import dqn
 import utils
 from wrappers import monitor, wrap_deepmind
 from q_functions import *
-from replay_memory import make_replay_memory
 
 
 def make_atari_env(name, seed):
@@ -28,6 +26,7 @@ def get_args():
     parser.add_argument('--chunk-size',  type=int, default=100)
     parser.add_argument('--seed',        type=int, default=0)
     parser.add_argument('--recurrent',   action='store_true')
+    parser.add_argument('--legacy',      action='store_true')
     return parser.parse_args()
 
 
@@ -46,8 +45,19 @@ def main():
                                outside_value=0.1,
                            )
 
-    replay_memory = make_replay_memory(args.return_type, args.history_len, size=1000000, discount=0.99)
-    replay_memory.config_cache(args.oversample, args.priority, args.chunk_size)
+    if not args.legacy:
+        from replay_memory import make_replay_memory
+        replay_memory = make_replay_memory(args.return_type, args.history_len, size=1000000, discount=0.99)
+        replay_memory.config_cache(args.oversample, args.priority, args.chunk_size)
+    else:
+        assert args.oversample == 1.0        # Ensure cache-related args have not been set
+        assert args.priority == 0.0
+        assert args.chunk_size == 100
+        assert 'nstep-' in args.return_type  # Only n-step returns are supported
+
+        from replay_memory_legacy import LegacyReplayMemory
+        n = int( args.return_type.strip('nstep-') )
+        replay_memory = LegacyReplayMemory(size=1000000, history_len=args.history_len, discount=0.99, n=n)
 
     with utils.make_session(args.seed) as session:
         dqn.learn(
