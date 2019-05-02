@@ -5,7 +5,7 @@ import tensorflow as tf
 import time
 
 from utils import *
-from wrappers import *
+from wrappers import HistoryWrapper
 from replay_memory import DynamicLambdaReplayMemory
 from replay_memory_legacy import LegacyReplayMemory
 
@@ -24,7 +24,7 @@ def learn(session,
           target_update_freq=10000,
           grad_clip=None,
           log_every_n_steps=100000,
-          mov_avg_size=500,
+          mov_avg_size=100,
     ):
 
     assert (learning_starts % target_update_freq) == 0
@@ -116,7 +116,7 @@ def learn(session,
     n_epochs = 0
 
     policy = epsilon_greedy_rnn if q_func.is_recurrent() else epsilon_greedy
-    rewards = deque(benchmark(benchmark_env, policy, epsilon=1.0, n_episodes=mov_avg_size), maxlen=mov_avg_size)
+    benchmark_rewards = benchmark(benchmark_env, policy, epsilon=1.0, n_episodes=mov_avg_size)
     start_time = time.time()
 
     for t in itertools.count():
@@ -127,7 +127,7 @@ def learn(session,
             print('Timestep', t)
             print('Realtime {:.3f}'.format(time.time() - start_time))
 
-            rewards.extend(get_episode_rewards(env))
+            rewards = (benchmark_rewards + get_episode_rewards(env))[-mov_avg_size:]
             mean_reward = np.mean(rewards)
             std_reward = np.std(rewards)
             best_mean_reward = max(mean_reward, best_mean_reward)
@@ -179,3 +179,6 @@ def learn(session,
 
                 if t % learning_freq == 0:
                     train()
+
+    all_rewards = benchmark_rewards + get_episode_rewards(env)
+    print('rewards=', all_rewards, sep='')

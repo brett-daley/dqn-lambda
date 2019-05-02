@@ -1,54 +1,90 @@
 ---
-exp1:
-  n_seeds: 3
-  env:
-    - beam_rider
-    - breakout
-    - pong
-    - qbert
-    - seaquest
-    - space_invaders
-  history_len: [1]
-  recurrent: false
+dqn-baseline:
+  legacy: true
+  num_seeds: 5
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [1, 4]
+  return_type: [nstep-3]
+
+drqn-baseline:
+  legacy: true
+  recurrent: true
+  num_seeds: 5
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [4]
+  return_type: [nstep-3]
+
+exp-0a:
+  num_seeds: 5
+  timesteps: 2000000
+  env: [pong]
+  history_len: [4]
+  return_type: [nstep-3]
+  oversample: [1.0, 1.5, 2.0, 2.5, 3.0]
+  priority: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+
+exp-0b:
+  num_seeds: 5
+  timesteps: 2000000
+  env: [pong]
+  history_len: [4]
   return_type:
-    - nstep-5
+    - pengs-dynamic-0.02
+    - pengs-dynamic-0.04
+    - pengs-dynamic-0.06
+    - pengs-dynamic-0.08
+    - pengs-dynamic-0.1
+  oversample: [1.0]
+  priority: [0.0]
+
+exp-1:
+  num_seeds: 5
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [4]
+  return_type:
     - pengs-0.25
     - pengs-0.5
     - pengs-0.75
-
-exp2a:
-  n_seeds: 3
-  env:
-    - breakout
-    - space_invaders
-  history_len: [1]
-  recurrent: false
-  return_type:
-    - renorm-pengs-0.25
+    - pengs-1.0
     - watkins-0.25
-    - renorm-watkins-0.25
-
-exp2b:
-  n_seeds: 3
-  env:
-    - beam_rider
-    - seaquest
-  history_len: [1]
-  recurrent: false
-  return_type:
-    - renorm-pengs-0.5
     - watkins-0.5
-    - renorm-watkins-0.5
-
-exp2c:
-  n_seeds: 3
-  env:
-    - pong
-    - qbert
-  history_len: [1]
-  recurrent: false
-  return_type:
-    - renorm-pengs-0.75
     - watkins-0.75
-    - renorm-watkins-0.75
+    - watkins-1.0
+  oversample: [1.0]
+  priority: [0.0]
+
+# exp-2:
+#   num_seeds: 5
+#   timesteps: 10000000
+#   env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+#   history_len: [4]
+#   return_type:
+#     - pengs-dynamic-x  # TODO
+#   oversample: [1.0]  # TODO
+#   priority: [0.0]  # TODO
+
+# exp-3a:
+#   num_seeds: 5
+#   timesteps: 10000000
+#   env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+#   history_len: [1, 4]
+#   return_type:
+#     - pengs-dynamic-x  # TODO
+#   oversample: [1.0]  # TODO
+#   priority: [0.0]  # TODO
+
+# exp-3b:
+#   recurrent: true
+#   num_seeds: 5
+#   timesteps: 10000000
+#   env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+#   history_len: [4]
+#   return_type:
+#     - pengs-dynamic-x  # TODO
+#   oversample: [1.0]  # TODO
+#   priority: [0.0]  # TODO
+
 ...

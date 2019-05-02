@@ -19,6 +19,7 @@ def make_atari_env(name, seed):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--env',         type=str, default='pong')
+    parser.add_argument('--timesteps',   type=int, default=10000000)
     parser.add_argument('--return-type', type=str, default='nstep-1')
     parser.add_argument('--history-len', type=int, default=4)
     parser.add_argument('--oversample',  type=float, default=1.0)
@@ -38,7 +39,6 @@ def main():
 
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-4, epsilon=1e-4)
 
-    n_timesteps = 10000000
     learning_starts = 50000
     exploration_schedule = utils.PiecewiseSchedule(
                                [(0, 1.0), (learning_starts, 1.0), (learning_starts + 1e6, 0.1)],
@@ -68,7 +68,7 @@ def main():
             replay_memory,
             optimizer=optimizer,
             exploration=exploration_schedule,
-            max_timesteps=n_timesteps,
+            max_timesteps=args.timesteps,
             batch_size=32,
             learning_starts=learning_starts,
             learning_freq=4,

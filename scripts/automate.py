@@ -49,35 +49,60 @@ class GPUArray:
             return 0
 
 
-def make_filename(env, history_len, recurrent, return_type, seed):
-    filename = ['drqn' if recurrent else 'dqn', env, 'len' + str(history_len), return_type, 'seed' + str(seed)]
-    return '_'.join(filename) + '.txt'
+def make_filename(env, legacy, history_len, recurrent, return_type, oversample, priority, seed):
+    if not legacy:
+        filename = ['drqn' if recurrent else 'dqn']
+    else:
+        filename = ['drqn-legacy' if recurrent else 'dqn-legacy']
+    filename += ['len-' + str(history_len)]
+    filename += [env.replace('_', '-')]
+    filename += [return_type]
+    if oversample is not None:
+        filename += ['oversample-' + str(oversample)]
+    if priority is not None:
+        filename += ['priority-' + str(priority)]
+    filename += ['seed-' + str(seed)]
+    return '_'.join(filename)
 
 
-def make_cmd(env, history_len, recurrent, return_type, seed):
+def make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, oversample, priority, seed):
     cmd  = ['python', 'run_dqn_atari.py']
     cmd += ['--env', env]
+    cmd += ['--timesteps', str(timesteps)]
     cmd += ['--history-len', str(history_len)]
     if recurrent:
         cmd += ['--recurrent']
     cmd += ['--return-type', return_type]
     cmd += ['--seed', str(seed)]
+    if not legacy:
+        cmd += ['--oversample', str(oversample)]
+        cmd += ['--priority', str(priority)]
+    else:
+        cmd += ['--legacy']
     return cmd
 
 
 def make_joblist(experiments):
     jobs = []
     for exp in experiments:
-        n_seeds = exp['n_seeds']
-        recurrent = exp['recurrent']
+        num_seeds = exp['num_seeds']
+        timesteps = exp['timesteps']
+        recurrent = exp.get('recurrent', False)
+
+        legacy = exp.get('legacy', False)
+        oversample = exp['oversample'] if not legacy else [None]
+        priority = exp['priority'] if not legacy else [None]
+
         for env in exp['env']:
             for history_len in exp['history_len']:
                 for return_type in exp['return_type']:
-                    for seed in range(n_seeds):
-                        cmd = make_cmd(env, history_len, recurrent, return_type, seed)
-                        filename = make_filename(env, history_len, recurrent, return_type, seed)
-                        path = os.path.join(args.outdir, filename)
-                        jobs.append((cmd, path))
+                    for x in oversample:
+                        for p in priority:
+                            for s in range(num_seeds):
+                                cmd = make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, oversample=x, priority=p, seed=s)
+                                filename = make_filename(env, legacy, history_len, recurrent, return_type, oversample=x, priority=p, seed=s)
+                                path = os.path.join(args.outdir, filename)
+                                jobs.append((cmd, path))
     return jobs
 
 

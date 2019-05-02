@@ -15,7 +15,7 @@ def benchmark(env, policy, epsilon, n_episodes):
             action, rnn_state = policy(state, rnn_state, epsilon)
             state, _, done, _ = env.step(action)
 
-    return get_episode_rewards(env)[-n_episodes:]
+    return list(get_episode_rewards(env)[-n_episodes:])
 
 
 def get_episode_rewards(env):
