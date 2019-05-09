@@ -112,6 +112,7 @@ class ReplayMemory:
         self.oversample = 1.0
         self.prioritize = 0.0
         self.chunk_size = 100
+        self.size += (self.history_len - 1) + self.chunk_size  # Extra samples to fit exactly `size` chunks
 
         self.refresh_func = None
 
@@ -152,16 +153,20 @@ class ReplayMemory:
         return self._encode_observation(i)
 
     def _encode_observation(self, i):
-        end = i + 1  # Make non-inclusive
-        start = end - self.history_len
+        if self.len() >= self.history_len:
+            assert self.history_len - 1 <= i < self.len()
 
-        pad_len = max(0, -start)
-        padding = [np.zeros_like(self.obs[0]) for _ in range(pad_len)]
+        # Start with blank observations except the last
+        obs = np.zeros([self.history_len, *self.obs[0].shape], dtype=self.obs[0].dtype)
+        obs[-1] = self.obs[i]
 
-        start = max(0, start)
-        obs = self.obs[start:end]
+        # Fill-in backwards, break if we reach a terminal state
+        for j in range(1, min(self.history_len, self.len())):
+            if self.dones[i-j]:
+                break
+            obs[-1-j] = self.obs[i-j]
 
-        return np.array(padding + obs)
+        return obs
 
     def store_obs(self, obs):
         self.obs.append(obs)
@@ -232,11 +237,10 @@ class ReplayMemory:
         np.random.shuffle(self.indices)
 
     def _sample_chunk_ids(self, n):
-        return np.random.randint(self.chunk_size, self.len() - 1, size=n)
+        return np.random.randint(self.history_len - 1, self.len() - self.chunk_size, size=n)
 
-    def _extract_chunk(self, list, end, obs=False):
-        end += 1  # Make non-inclusive
-        start = end - self.chunk_size
+    def _extract_chunk(self, list, start, obs=False):
+        end = start + self.chunk_size
         if obs:
             return np.array([self._encode_observation(i) for i in range(start, end + 1)])
         return np.array(list[start:end])

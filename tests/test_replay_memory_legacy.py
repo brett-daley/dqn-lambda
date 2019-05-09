@@ -22,7 +22,7 @@ class TestCaseLegacyReplayMemory(TestCaseCore):
     def test_nstep(self):
         m = LegacyReplayMemory(size=20, history_len=1, discount=0.9, n=3)
         self.fill(m)
-        obs, actions, returns = m._sample(np.arange(2, 9))
+        obs, actions, returns = m._sample(np.arange(0, 7))
 
         self.assertNumpyEqual(obs,     [   0,   1,    2,    3,     4,     5,   6])
         self.assertNumpyEqual(actions, [   7,   0,    1,    6,     4,     2,   5])

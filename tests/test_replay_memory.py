@@ -48,7 +48,7 @@ class TestCaseCore(unittest.TestCase):
 class TestCaseReplayMemory(TestCaseCore):
     def fill(self, replay_memory):
         super().fill(replay_memory)
-        replay_memory._refresh(cache_size=9, train_frac=0.0, chunk_ids=[2, 5, 8])
+        replay_memory._refresh(cache_size=9, train_frac=0.0, chunk_ids=[0, 3, 6])
 
     def test_1step(self):
         m = NStepReplayMemory(size=20, history_len=1, discount=0.9, n=1)
