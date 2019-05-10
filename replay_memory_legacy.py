@@ -20,7 +20,7 @@ class LegacyReplayMemory(NStepReplayMemory):
         obs_batch, act_batch, rew_batch, done_batch = [], [], [], []
 
         for i in indices:
-            obs_batch.append( self._extract_chunk(self.obs, i, obs=True) )
+            obs_batch.append( self._extract_chunk(None, i, obs=True) )
             act_batch.append( self._extract_chunk(self.actions, i) )
             rew_batch.append( self._extract_chunk(self.rewards, i) )
             done_batch.append( self._extract_chunk(self.dones, i).astype(np.float32) )

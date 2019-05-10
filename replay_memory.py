@@ -108,6 +108,7 @@ class ReplayMemory:
         self.size = size
         self.history_len = history_len
         self.discount = discount
+        self.num_samples = 0
 
         self.oversample = 1.0
         self.prioritize = 0.0
@@ -116,10 +117,11 @@ class ReplayMemory:
 
         self.refresh_func = None
 
-        self.obs     = []
-        self.actions = []
-        self.rewards = []
-        self.dones   = []
+        self.obs = None  # Allocated dynamically once shape/dtype are known
+        self.actions = np.empty([self.size], dtype=np.int32)
+        self.rewards = np.empty([self.size], dtype=np.float64)
+        self.dones = np.empty([self.size], dtype=np.bool)
+        self.next = 0  # Points to next transition to be overwritten
 
     def register_refresh_func(self, f):
         assert self.refresh_func is None
@@ -149,12 +151,11 @@ class ReplayMemory:
         return np.array(obs_batch), np.array(act_batch), np.array(ret_batch)
 
     def encode_recent_observation(self):
-        i = self.len() - 1
+        i = self.len()
         return self._encode_observation(i)
 
     def _encode_observation(self, i):
-        if self.len() >= self.history_len:
-            assert self.history_len - 1 <= i < self.len()
+        i = self._align(i)
 
         # Start with blank observations except the last
         obs = np.zeros([self.history_len, *self.obs[0].shape], dtype=self.obs[0].dtype)
@@ -168,24 +169,29 @@ class ReplayMemory:
 
         return obs
 
+    def _align(self, i):
+        # Make relative to pointer when full
+        if not self.full(): return i
+        return (i + self.next) % self.size
+
     def store_obs(self, obs):
-        self.obs.append(obs)
+        if self.obs is None:
+            self.obs = np.empty([self.size] + list(obs.shape), dtype=obs.dtype)
+        self.obs[self.next] = obs
 
     def store_effect(self, action, reward, done):
-        self.actions.append(action)
-        self.rewards.append(reward)
-        self.dones.append(done)
+        self.actions[self.next] = action
+        self.rewards[self.next] = reward
+        self.dones[self.next] = done
 
-        if self.len() > self.size:
-            self.obs.pop(0)
-            self.actions.pop(0)
-            self.rewards.pop(0)
-            self.dones.pop(0)
-
-        assert len(self.obs) == len(self.actions) == len(self.rewards) == len(self.dones)
+        self.next = (self.next + 1) % self.size
+        self.num_samples = min(self.size, self.num_samples + 1)
 
     def len(self):
-        return len(self.obs)
+        return self.num_samples
+
+    def full(self):
+        return self.len() == self.size
 
     def refresh(self, cache_size, train_frac):
         # Reset batch counter
@@ -199,7 +205,7 @@ class ReplayMemory:
 
     def _refresh(self, cache_size, train_frac, chunk_ids):
         # Refresh the chunks we sampled
-        obs_chunks = [self._extract_chunk(self.obs, i, obs=True) for i in chunk_ids]
+        obs_chunks = [self._extract_chunk(None, i, obs=True) for i in chunk_ids]
         action_chunks = [self._extract_chunk(self.actions, i) for i in chunk_ids]
         reward_chunks = [self._extract_chunk(self.rewards, i) for i in chunk_ids]
         done_chunks = [self._extract_chunk(self.dones, i) for i in chunk_ids]
@@ -239,11 +245,12 @@ class ReplayMemory:
     def _sample_chunk_ids(self, n):
         return np.random.randint(self.history_len - 1, self.len() - self.chunk_size, size=n)
 
-    def _extract_chunk(self, list, start, obs=False):
+    def _extract_chunk(self, a, start, obs=False):
         end = start + self.chunk_size
         if obs:
+            assert a is None
             return np.array([self._encode_observation(i) for i in range(start, end + 1)])
-        return np.array(list[start:end])
+        return a[self._align(np.arange(start, end))]
 
     def priority_now(self, train_frac):
         return self.priority * (1.0 - train_frac)
