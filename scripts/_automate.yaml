@@ -56,25 +56,37 @@ exp-1:
   oversample: [1.0]
   priority: [0.0]
 
-# exp-2:
-#   num_seeds: 5
-#   timesteps: 10000000
-#   env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
-#   history_len: [4]
-#   return_type:
-#     - pengs-dynamic-x  # TODO
-#   oversample: [1.0]  # TODO
-#   priority: [0.0]  # TODO
+exp-2a:
+  num_seeds: 5
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [1, 4]
+  return_type:
+    - pengs-dynamic-0.02
+  oversample: [2.5]
+  priority: [0.4]
+
+exp-2b:
+  recurrent: true
+  num_seeds: 5
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [4]
+  return_type:
+    - pengs-dynamic-0.02
+  oversample: [2.5]
+  priority: [0.4]
 
 # exp-3a:
+#   recurrent: true
 #   num_seeds: 5
 #   timesteps: 10000000
 #   env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
-#   history_len: [1, 4]
+#   history_len: [1]
 #   return_type:
-#     - pengs-dynamic-x  # TODO
-#   oversample: [1.0]  # TODO
-#   priority: [0.0]  # TODO
+#     - pengs-or-watkins TODO
+#   oversample: [1.0]
+#   priority: [0.0]
 
 # exp-3b:
 #   recurrent: true
@@ -83,8 +95,7 @@ exp-1:
 #   env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
 #   history_len: [4]
 #   return_type:
-#     - pengs-dynamic-x  # TODO
-#   oversample: [1.0]  # TODO
-#   priority: [0.0]  # TODO
-
+#     - pengs-or-watkins TODO
+#   oversample: [1.0]
+#   priority: [0.0]
 ...
