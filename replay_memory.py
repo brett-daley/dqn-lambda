@@ -213,13 +213,12 @@ class ReplayMemory:
         return_chunks = []
         error_chunks = []
         for obs, actions, rewards, dones in zip(obs_chunks, action_chunks, reward_chunks, done_chunks):
-            qvalues, mask = self.refresh_func(obs, actions)
+            max_qvalues, mask, onpolicy_qvalues = self.refresh_func(obs, actions)
 
-            returns = self._calculate_returns(rewards, qvalues, dones, mask)
+            returns = self._calculate_returns(rewards, max_qvalues, dones, mask)
             return_chunks.append(returns)
 
-            one_step_returns = calculate_nstep_returns(rewards, qvalues, dones, self.discount, n=1)
-            errors = np.abs(one_step_returns - qvalues[:-1])
+            errors = np.abs(returns - onpolicy_qvalues)
             error_chunks.append(errors)
 
         # Collect and store data
@@ -323,7 +322,7 @@ class DynamicLambdaReplayMemory(LambdaReplayMemory):
     def _try_lambda(self, f, rewards, qvalues, dones, mask, lambd):
         self.lambd = lambd  # Pass implicitly to parent function
         returns = f(rewards, qvalues, dones, mask)
-        td_error = np.square(returns - qvalues[:-1]).mean()
+        td_error = np.square(returns - qvalues[:-1]).max()
         ok = (td_error <= self.max_td)
         return returns, ok
 

@@ -59,12 +59,12 @@ def learn(session,
     if not legacy_mode:
         def refresh(states, actions):
             assert len(states) == len(actions) + 1  # We should have an extra bootstrap state
-            greedy_qvals, greedy_acts = session.run([greedy_qvalues, greedy_actions], feed_dict={
+            greedy_qvals, greedy_acts, onpolicy_qvals = session.run([greedy_qvalues, greedy_actions, onpolicy_qvalues], feed_dict={
                 obs_t_ph: states,
                 act_t_ph: actions,
             })
             mask = (actions == greedy_acts[:-1])
-            return greedy_qvals, mask
+            return greedy_qvals, mask, onpolicy_qvals
     else:
         max_target_qvalues = tf.reduce_max(QFunction(obs_t_ph, n_actions, scope='target').qvalues, axis=1)
         target_update_op = create_copy_op(src_scope='main', dst_scope='target')

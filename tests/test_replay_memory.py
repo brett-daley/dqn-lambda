@@ -23,10 +23,10 @@ class TestCaseCore(unittest.TestCase):
         qvalues = np.array([t[4] for t in self.transitions])
         mask    = np.array([t[5] for t in self.transitions], dtype=np.float32)
         def refresh(states, actions):
-            return (
-                np.reshape([qvalues[s] for s in states], -1),
-                np.reshape([mask[s] for s in states], -1),
-            )
+            greedy_qvalues = np.reshape([qvalues[s] for s in states], -1)
+            greedy_mask = np.reshape([mask[s] for s in states], -1)
+            onpolicy_qvalues = greedy_qvalues[:-1]  # Not used
+            return greedy_qvalues, greedy_mask, onpolicy_qvalues
         self.refresh = refresh
         # Now remove Q-value information from transitions, because tests don't need it explicitly
         self.transitions = [(np.array(state), np.array(action), reward, done) for state, action, reward, done, _, _ in self.transitions]
