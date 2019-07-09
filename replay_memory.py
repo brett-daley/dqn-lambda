@@ -15,10 +15,6 @@ def make_replay_memory(return_type, history_len, size, discount):
             n = int(return_type)
             return NStepReplayMemory(size, history_len, discount, n)
 
-        renormalize = return_type.startswith('renorm-')
-        if renormalize:
-            return_type = remove(return_type, 'renorm-')
-
         if return_type.startswith('pengs-'):
             return_type = remove(return_type, 'pengs-')
             use_watkins = False
@@ -28,13 +24,11 @@ def make_replay_memory(return_type, history_len, size, discount):
         else:
             raise ValueError
 
-        if return_type.startswith('dynamic-'):
-            return_type = remove(return_type, 'dynamic-')
-            max_td = float(return_type)
-            return DynamicLambdaReplayMemory(size, history_len, discount, max_td, renormalize, use_watkins)
+        if return_type == 'dynamic':
+            return DynamicLambdaReplayMemory(size, history_len, discount, use_watkins)
 
         lambd = float(return_type)
-        return LambdaReplayMemory(size, history_len, discount, lambd, renormalize, use_watkins)
+        return LambdaReplayMemory(size, history_len, discount, lambd, use_watkins)
 
     except:
         raise ValueError('Unrecognized return type {}'.format(_return_type))
@@ -56,25 +50,6 @@ def calculate_lambda_returns(rewards, qvalues, dones, mask, discount, lambd):
         a = lambda_returns[i] + (discount * lambd * mask[i]) * (lambda_returns[i+1] - qvalues[i+1])
         b = rewards[i]
         lambda_returns[i] = (1.0 - dones[i]) * a + dones[i] * b
-    return lambda_returns
-
-
-def calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, lambd):
-    raise NotImplementedError
-
-    def k(n):
-        if n == 0:
-            return 1.0
-        return (1.0 - lambd**n) / (1.0 - lambd)
-
-    next_qvalues = shift(qvalues)  # Final state in episode is terminal
-    lambda_returns = rewards + (discount * next_qvalues)
-
-    n = 1
-    for i in reversed(range(len(rewards) - 1)):
-        l = lambd * mask[i]
-        n = (n * int(mask[i])) + 1
-        lambda_returns[i] = (1. / k(n)) * (lambda_returns[i] + l * k(n-1) * (rewards[i] + discount * lambda_returns[i+1]))
     return lambda_returns
 
 
@@ -259,72 +234,30 @@ class ReplayMemory:
 
 
 class LambdaReplayMemory(ReplayMemory):
-    def __init__(self, size, history_len, discount, lambd, renormalize, use_watkins):
+    def __init__(self, size, history_len, discount, lambd, use_watkins):
         self.lambd = lambd
-        self.renormalize = renormalize
         self.use_watkins = use_watkins
         super().__init__(size, history_len, discount)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
         if not self.use_watkins:
             mask = np.ones_like(qvalues)
-
-        f = (calculate_renormalized_lambda_returns if self.renormalize else calculate_lambda_returns)
-        return f(rewards, qvalues, dones, mask, self.discount, self.lambd)
+        return calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, self.lambd)
 
 
 class DynamicLambdaReplayMemory(LambdaReplayMemory):
-    def __init__(self, size, history_len, discount, max_td, renormalize, use_watkins):
+    def __init__(self, size, history_len, discount, use_watkins):
         lambd = None
-        self.lambdas_since_refresh = []
-        self.max_td = max_td
-        super().__init__(size, history_len, discount, lambd, renormalize, use_watkins)
-
-    def refresh(self, cache_size, train_frac):
-        self.lambdas_since_refresh.clear()
-        super().refresh(cache_size, train_frac)
+        super().__init__(size, history_len, discount, lambd, use_watkins)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
-        f = super()._calculate_returns  # Use parent function to compute returns
-
-        # Try the extremes first
-        returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd=1.0)
-        if ok:
-            self.lambdas_since_refresh.append(1.0)
-            return returns
-
-        returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd=0.0)
-        if not ok:
-            self.lambdas_since_refresh.append(0.0)
-            return returns
-
-        # If we haven't returned by now, we need to search for a good lambda value
-        best_returns, best_lambd = None, None
-        lambd = 0.5
-        num_iterations = 7
-
-        for i in range(2, 2 + num_iterations):
-            returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd)
-
-            if ok:
-                best_returns, best_lambd = returns, lambd
-                lambd += 1.0 / (2.0 ** i)
-            else:
-                lambd -= 1.0 / (2.0 ** i)
-
-        if best_returns is None:
-            self.lambdas_since_refresh.append(lambd)
-            return returns
-
-        self.lambdas_since_refresh.append(best_lambd)
-        return best_returns
-
-    def _try_lambda(self, f, rewards, qvalues, dones, mask, lambd):
-        self.lambd = lambd  # Pass implicitly to parent function
-        returns = f(rewards, qvalues, dones, mask)
-        td_error = np.square(returns - qvalues[:-1]).max()
-        ok = (td_error <= self.max_td)
-        return returns, ok
+        if not self.use_watkins:
+            mask = np.ones_like(qvalues)
+        returns = np.empty(shape=[21, rewards.size], dtype=np.float32)
+        for n in range(0, 21):
+            lambd = n / 20.0
+            returns[n] = calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, lambd)
+        return np.median(returns, axis=0)
 
 
 class NStepReplayMemory(ReplayMemory):

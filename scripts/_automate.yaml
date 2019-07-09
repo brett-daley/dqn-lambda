@@ -16,7 +16,7 @@ drqn-baseline:
   history_len: [4]
   return_type: [nstep-3]
 
-exp-0a:
+exp-0:
   num_seeds: 5
   timesteps: 2000000
   env: [pong]
@@ -24,20 +24,6 @@ exp-0a:
   return_type: [nstep-3]
   oversample: [1.0, 1.5, 2.0, 2.5, 3.0]
   priority: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-
-exp-0b:
-  num_seeds: 5
-  timesteps: 2000000
-  env: [pong]
-  history_len: [4]
-  return_type:
-    - pengs-dynamic-0.02
-    - pengs-dynamic-0.04
-    - pengs-dynamic-0.06
-    - pengs-dynamic-0.08
-    - pengs-dynamic-0.1
-  oversample: [1.0]
-  priority: [0.0]
 
 exp-1:
   num_seeds: 5
@@ -62,7 +48,7 @@ exp-2a:
   env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
   history_len: [1, 4]
   return_type:
-    - pengs-dynamic-0.02
+    - pengs-dynamic
   oversample: [2.5]
   priority: [0.4]
 
@@ -73,7 +59,7 @@ exp-2b:
   env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
   history_len: [4]
   return_type:
-    - pengs-dynamic-0.02
+    - pengs-dynamic
   oversample: [2.5]
   priority: [0.4]
 

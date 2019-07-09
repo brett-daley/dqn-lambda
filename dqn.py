@@ -136,11 +136,6 @@ def learn(session,
             print('Exploration', exploration.value(t))
             if not legacy_mode:
                 print('Priority', replay_memory.priority_now(train_frac))
-            if isinstance(replay_memory, DynamicLambdaReplayMemory):
-                lambdas = replay_memory.lambdas_since_refresh
-                if len(lambdas) > 0:
-                    print('Mean lambda', np.mean(lambdas))
-                    print('Std. lambda', np.std(lambdas))
             print('Mean reward', mean_reward)
             print('Best mean reward', best_mean_reward)
             print('Std. reward', std_reward)
