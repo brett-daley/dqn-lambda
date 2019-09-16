@@ -92,11 +92,18 @@ class ReplayMemory:
 
         self.refresh_func = None
 
+        # Main variables for memory
         self.obs = None  # Allocated dynamically once shape/dtype are known
         self.actions = np.empty([self.size], dtype=np.int32)
-        self.rewards = np.empty([self.size], dtype=np.float64)
+        self.rewards = np.empty([self.size], dtype=np.float32)
         self.dones = np.empty([self.size], dtype=np.bool)
         self.next = 0  # Points to next transition to be overwritten
+
+        # Auxiliary buffers for the cache -- pre-allocated to smooth memory usage
+        self.cached_obs = None  # Allocated dynamically once shape/dtype are known
+        self.cached_actions = np.empty([self.size], dtype=np.int32)
+        self.cached_returns = np.empty([self.size], dtype=np.float32)
+        self.cached_errors = np.empty([self.size], dtype=np.float32)
 
     def register_refresh_func(self, f):
         assert self.refresh_func is None
@@ -106,8 +113,6 @@ class ReplayMemory:
         assert oversample >= 1.0
         assert 0.0 <= priority <= 1.0
         assert isinstance(chunk_size, int) and chunk_size >= 1
-        if oversample == 1.0 and priority > 0.0:
-            raise ValueError("Can't prioritize when oversampling ratio is 1.0")
         self.oversample = oversample
         self.priority = priority
         self.chunk_size = chunk_size
@@ -200,21 +205,18 @@ class ReplayMemory:
         self.cached_obs = np.concatenate([c[:-1] for c in obs_chunks])
         self.cached_actions = np.concatenate([c for c in action_chunks])
         self.cached_returns = np.concatenate([c for c in return_chunks])
+        self.cached_errors = np.concatenate([c for c in error_chunks])
 
-        self.indices = np.arange(len(self.cached_returns))
-        np.random.shuffle(self.indices)
-
-        if self.priority > 0.0:
-            cached_errors = np.concatenate([c for c in error_chunks])
-            sort = np.argsort(cached_errors)[::-1]
-            prioritized = self.indices[sort]
-
-            p = self.priority_now(train_frac)
-            b = np.random.choice([0, 1], size=self.indices.shape, p=[1-p, p])
-            self.indices[b == 1] = prioritized[b == 1]
-
-        self.indices = self.indices[:cache_size]
-        np.random.shuffle(self.indices)
+        # Prioritize samples
+        p = self.priority_now(train_frac)
+        threshold = np.quantile(self.cached_errors, p)
+        distr = np.where(
+            self.cached_errors >= threshold,
+            np.ones_like(self.cached_errors),
+            np.zeros_like(self.cached_errors),
+        )
+        distr /= distr.sum()  # Probabilities must sum to 1
+        self.indices = np.random.choice(len(self.cached_returns), size=cache_size, replace=True, p=distr)
 
     def _sample_chunk_ids(self, n):
         return np.random.randint(self.history_len - 1, self.len() - self.chunk_size, size=n)
