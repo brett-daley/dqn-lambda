@@ -3,14 +3,8 @@ from replay_memory import NStepReplayMemory
 
 
 class LegacyReplayMemory(NStepReplayMemory):
-    def __init__(self, size, history_len, discount, n):
-        super().__init__(size, history_len, discount, n)
-        self.oversample = None
-        self.prioritize = None
-        self.chunk_size = n
-
-    def config_cache(self, oversample, priority, chunk_size):
-        raise NotImplementedError
+    def __init__(self, capacity, history_len, discount, n):
+        super().__init__(capacity, history_len, discount, cache_size=0, chunk_size=n, priority=0.0, n=n)
 
     def sample(self, batch_size):
         indices = self._sample_chunk_ids(batch_size)

@@ -161,11 +161,9 @@ def learn(session,
         if t >= learning_starts:
             if not legacy_mode:
                 if t % target_update_freq == 0:
+                    replay_memory.refresh(train_frac)
+
                     num_train_iterations = target_update_freq // learning_freq
-                    cache_size = batch_size * num_train_iterations
-
-                    replay_memory.refresh(cache_size, train_frac)
-
                     for _ in range(num_train_iterations):
                         train()
             else:

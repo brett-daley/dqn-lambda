@@ -30,8 +30,8 @@ def main():
                                outside_value=0.1,
                            )
 
-    replay_memory = make_replay_memory(return_type='nstep-5', history_len=1, size=500000, discount=0.99)
-    replay_memory.config_cache(oversample=1.0, priority=0.0, chunk_size=100)
+    replay_memory = make_replay_memory(return_type='nstep-5', capacity=500000, history_len=1, discount=0.99,
+                                       cache_size=80000, chunk_size=100, priority=0.0)
 
     with utils.make_session(seed) as session:
         dqn.learn(

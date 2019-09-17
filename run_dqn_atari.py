@@ -22,9 +22,9 @@ def get_args():
     parser.add_argument('--timesteps',   type=int, default=10000000)
     parser.add_argument('--return-type', type=str, default='nstep-1')
     parser.add_argument('--history-len', type=int, default=4)
-    parser.add_argument('--oversample',  type=float, default=1.0)
-    parser.add_argument('--priority',    type=float, default=0.0)
+    parser.add_argument('--cache-size',  type=int, default=80000)
     parser.add_argument('--chunk-size',  type=int, default=100)
+    parser.add_argument('--priority',    type=float, default=0.0)
     parser.add_argument('--seed',        type=int, default=0)
     parser.add_argument('--recurrent',   action='store_true')
     parser.add_argument('--legacy',      action='store_true')
@@ -44,20 +44,22 @@ def main():
                                [(0, 1.0), (learning_starts, 1.0), (learning_starts + 1e6, 0.1)],
                                outside_value=0.1,
                            )
+    discount = 0.99
+    replay_mem_size = 1000000
 
     if not args.legacy:
         from replay_memory import make_replay_memory
-        replay_memory = make_replay_memory(args.return_type, args.history_len, size=1000000, discount=0.99)
-        replay_memory.config_cache(args.oversample, args.priority, args.chunk_size)
+        replay_memory = make_replay_memory(args.return_type, replay_mem_size, args.history_len, discount,
+                                           args.cache_size, args.chunk_size, args.priority)
     else:
-        assert args.oversample == 1.0        # Ensure cache-related args have not been set
+        assert args.cache_size == 80000      # Ensure cache-related args have not been set
         assert args.priority == 0.0
         assert args.chunk_size == 100
         assert 'nstep-' in args.return_type  # Only n-step returns are supported
 
         from replay_memory_legacy import LegacyReplayMemory
         n = int( args.return_type.strip('nstep-') )
-        replay_memory = LegacyReplayMemory(size=1000000, history_len=args.history_len, discount=0.99, n=n)
+        replay_memory = LegacyReplayMemory(replay_mem_size, args.history_len, discount, n=n)
 
     with utils.make_session(args.seed) as session:
         dqn.learn(

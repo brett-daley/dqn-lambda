@@ -6,14 +6,15 @@ def remove(string, prefix):
     return string[len(prefix):]
 
 
-def make_replay_memory(return_type, history_len, size, discount):
+def make_replay_memory(return_type, capacity, history_len, discount, cache_size, chunk_size, priority):
     _return_type = return_type  # In case we raise an exception
+    shared_args = (capacity, history_len, discount, cache_size, chunk_size, priority)
 
     try:
         if return_type.startswith('nstep-'):
             return_type = remove(return_type, 'nstep-')
             n = int(return_type)
-            return NStepReplayMemory(size, history_len, discount, n)
+            return NStepReplayMemory(*shared_args, n)
 
         if return_type.startswith('pengs-'):
             return_type = remove(return_type, 'pengs-')
@@ -25,10 +26,10 @@ def make_replay_memory(return_type, history_len, size, discount):
             raise ValueError
 
         if return_type == 'dynamic':
-            return DynamicLambdaReplayMemory(size, history_len, discount, use_watkins)
+            return DynamicLambdaReplayMemory(*shared_args, use_watkins)
 
         lambd = float(return_type)
-        return LambdaReplayMemory(size, history_len, discount, lambd, use_watkins)
+        return LambdaReplayMemory(*shared_args, lambd, use_watkins)
 
     except:
         raise ValueError('Unrecognized return type {}'.format(_return_type))
@@ -79,43 +80,34 @@ def calculate_nstep_returns(rewards, qvalues, dones, discount, n):
 
 
 class ReplayMemory:
-    def __init__(self, size, history_len, discount):
-        self.size = size
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority):
+        # Extra samples to fit exactly `capacity` (overlapping) chunks
+        self.capacity = capacity + (history_len - 1) + chunk_size
         self.history_len = history_len
         self.discount = discount
         self.num_samples = 0
 
-        self.oversample = 1.0
-        self.prioritize = 0.0
-        self.chunk_size = 100
-        self.size += (self.history_len - 1) + self.chunk_size  # Extra samples to fit exactly `size` chunks
-
+        self.cache_size = cache_size
+        self.chunk_size = chunk_size
+        self.priority = priority
         self.refresh_func = None
 
         # Main variables for memory
         self.obs = None  # Allocated dynamically once shape/dtype are known
-        self.actions = np.empty([self.size], dtype=np.int32)
-        self.rewards = np.empty([self.size], dtype=np.float32)
-        self.dones = np.empty([self.size], dtype=np.bool)
+        self.actions = np.empty([self.capacity], dtype=np.int32)
+        self.rewards = np.empty([self.capacity], dtype=np.float32)
+        self.dones = np.empty([self.capacity], dtype=np.bool)
         self.next = 0  # Points to next transition to be overwritten
 
         # Auxiliary buffers for the cache -- pre-allocated to smooth memory usage
         self.cached_obs = None  # Allocated dynamically once shape/dtype are known
-        self.cached_actions = np.empty([self.size], dtype=np.int32)
-        self.cached_returns = np.empty([self.size], dtype=np.float32)
-        self.cached_errors = np.empty([self.size], dtype=np.float32)
+        self.cached_actions = np.empty([self.capacity], dtype=np.int32)
+        self.cached_returns = np.empty([self.capacity], dtype=np.float32)
+        self.cached_errors = np.empty([self.capacity], dtype=np.float32)
 
     def register_refresh_func(self, f):
         assert self.refresh_func is None
         self.refresh_func = f
-
-    def config_cache(self, oversample, priority, chunk_size):
-        assert oversample >= 1.0
-        assert 0.0 <= priority <= 1.0
-        assert isinstance(chunk_size, int) and chunk_size >= 1
-        self.oversample = oversample
-        self.priority = priority
-        self.chunk_size = chunk_size
 
     def sample(self, batch_size):
         start = self.batch_counter * batch_size
@@ -152,11 +144,11 @@ class ReplayMemory:
     def _align(self, i):
         # Make relative to pointer when full
         if not self.full(): return i
-        return (i + self.next) % self.size
+        return (i + self.next) % self.capacity
 
     def store_obs(self, obs):
         if self.obs is None:
-            self.obs = np.empty([self.size] + list(obs.shape), dtype=obs.dtype)
+            self.obs = np.empty([self.capacity] + list(obs.shape), dtype=obs.dtype)
         self.obs[self.next] = obs
 
     def store_effect(self, action, reward, done):
@@ -164,26 +156,26 @@ class ReplayMemory:
         self.rewards[self.next] = reward
         self.dones[self.next] = done
 
-        self.next = (self.next + 1) % self.size
-        self.num_samples = min(self.size, self.num_samples + 1)
+        self.next = (self.next + 1) % self.capacity
+        self.num_samples = min(self.capacity, self.num_samples + 1)
 
     def len(self):
         return self.num_samples
 
     def full(self):
-        return self.len() == self.size
+        return self.len() == self.capacity
 
-    def refresh(self, cache_size, train_frac):
+    def refresh(self, train_frac):
         # Reset batch counter
         self.batch_counter = 0
 
         # Sample chunks until we have enough data
-        num_chunks = int(self.oversample * cache_size) // self.chunk_size
+        num_chunks = self.cache_size // self.chunk_size
         chunk_ids = self._sample_chunk_ids(num_chunks)
 
-        self._refresh(cache_size, train_frac, chunk_ids)  # Separate function for unit testing
+        self._refresh(train_frac, chunk_ids)  # Separate function for unit testing
 
-    def _refresh(self, cache_size, train_frac, chunk_ids):
+    def _refresh(self, train_frac, chunk_ids):
         # Refresh the chunks we sampled
         obs_chunks = [self._extract_chunk(None, i, obs=True) for i in chunk_ids]
         action_chunks = [self._extract_chunk(self.actions, i) for i in chunk_ids]
@@ -216,7 +208,7 @@ class ReplayMemory:
             np.zeros_like(self.cached_errors),
         )
         distr /= distr.sum()  # Probabilities must sum to 1
-        self.indices = np.random.choice(len(self.cached_returns), size=cache_size, replace=True, p=distr)
+        self.indices = np.random.choice(self.cache_size, size=self.cache_size, replace=True, p=distr)
 
     def _sample_chunk_ids(self, n):
         return np.random.randint(self.history_len - 1, self.len() - self.chunk_size, size=n)
@@ -236,10 +228,10 @@ class ReplayMemory:
 
 
 class LambdaReplayMemory(ReplayMemory):
-    def __init__(self, size, history_len, discount, lambd, use_watkins):
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins):
         self.lambd = lambd
         self.use_watkins = use_watkins
-        super().__init__(size, history_len, discount)
+        super().__init__(capacity, history_len, discount)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
         if not self.use_watkins:
@@ -248,9 +240,9 @@ class LambdaReplayMemory(ReplayMemory):
 
 
 class DynamicLambdaReplayMemory(LambdaReplayMemory):
-    def __init__(self, size, history_len, discount, use_watkins):
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, use_watkins):
         lambd = None
-        super().__init__(size, history_len, discount, lambd, use_watkins)
+        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
         if not self.use_watkins:
@@ -263,9 +255,9 @@ class DynamicLambdaReplayMemory(LambdaReplayMemory):
 
 
 class NStepReplayMemory(ReplayMemory):
-    def __init__(self, size, history_len, discount, n):
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, n):
         self.n = n
-        super().__init__(size, history_len, discount)
+        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
         return calculate_nstep_returns(rewards, qvalues, dones, self.discount, self.n)
