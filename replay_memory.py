@@ -81,6 +81,7 @@ def calculate_nstep_returns(rewards, qvalues, dones, discount, n):
 
 class ReplayMemory:
     def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority):
+        assert (cache_size % chunk_size) == 0
         # Extra samples to fit exactly `capacity` (overlapping) chunks
         self.capacity = capacity + (history_len - 1) + chunk_size
         self.history_len = history_len
@@ -101,9 +102,10 @@ class ReplayMemory:
 
         # Auxiliary buffers for the cache -- pre-allocated to smooth memory usage
         self.cached_obs = None  # Allocated dynamically once shape/dtype are known
-        self.cached_actions = np.empty([self.capacity], dtype=np.int32)
-        self.cached_returns = np.empty([self.capacity], dtype=np.float32)
-        self.cached_errors = np.empty([self.capacity], dtype=np.float32)
+        self.cached_actions = np.empty([self.cache_size], dtype=np.int32)
+        self.cached_returns = np.empty([self.cache_size], dtype=np.float32)
+        self.cached_errors  = np.empty([self.cache_size], dtype=np.float32)
+        self.cached_indices = np.empty([self.cache_size], dtype=np.int32)
 
     def register_refresh_func(self, f):
         assert self.refresh_func is None
@@ -112,7 +114,7 @@ class ReplayMemory:
     def sample(self, batch_size):
         start = self.batch_counter * batch_size
         end = start + batch_size
-        indices = self.indices[start:end]
+        indices = self.cached_indices[start:end]
 
         obs_batch = self.cached_obs[indices]
         act_batch = self.cached_actions[indices]
@@ -148,7 +150,9 @@ class ReplayMemory:
 
     def store_obs(self, obs):
         if self.obs is None:
-            self.obs = np.empty([self.capacity] + list(obs.shape), dtype=obs.dtype)
+            self.obs = np.empty([self.capacity, *obs.shape], dtype=obs.dtype)
+        if self.cached_obs is None:
+            self.cached_obs = np.empty([self.cache_size, *obs.shape], dtype=obs.dtype)
         self.obs[self.next] = obs
 
     def store_effect(self, action, reward, done):
@@ -200,15 +204,8 @@ class ReplayMemory:
         self.cached_errors = np.concatenate([c for c in error_chunks])
 
         # Prioritize samples
-        p = self.priority_now(train_frac)
-        threshold = np.quantile(self.cached_errors, p)
-        distr = np.where(
-            self.cached_errors >= threshold,
-            np.ones_like(self.cached_errors),
-            np.zeros_like(self.cached_errors),
-        )
-        distr /= distr.sum()  # Probabilities must sum to 1
-        self.indices = np.random.choice(self.cache_size, size=self.cache_size, replace=True, p=distr)
+        distr = self._prioritized_distribution(self.cached_errors, train_frac)
+        self.cached_indices = np.random.choice(self.cache_size, size=self.cache_size, replace=True, p=distr)
 
     def _sample_chunk_ids(self, n):
         return np.random.randint(self.history_len - 1, self.len() - self.chunk_size, size=n)
@@ -219,6 +216,19 @@ class ReplayMemory:
             assert a is None
             return np.array([self._encode_observation(i) for i in range(start, end + 1)])
         return a[self._align(np.arange(start, end))]
+
+    def _prioritized_distribution(self, errors, train_frac):
+        # Start with the uniform distribution.
+        distr = np.ones_like(errors) / self.cache_size
+        # Adjust the probabilities based on whether their corresponding errors lie above/below the median.
+        p = self.priority_now(train_frac)
+        med = np.median(errors)
+        distr[errors > med] *= (1.0 + p)
+        distr[errors < med] *= (1.0 - p)
+        # Note that if the error was identically equal to the median, its probability was not adjusted;
+        # this is the correct behavior to guarantee the probabilities sum to 1.
+        # However, due to floating point errors, we still need to re-normalize the distribution here:
+        return distr / distr.sum()
 
     def priority_now(self, train_frac):
         return self.priority * (1.0 - train_frac)
