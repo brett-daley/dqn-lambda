@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from replay_memory import NStepReplayMemory, LambdaReplayMemory
+from replay_memory import make_replay_memory
 
 
 class TestCaseCore(unittest.TestCase):
@@ -41,18 +41,16 @@ class TestCaseCore(unittest.TestCase):
     def assertNumpyEqual(self, x, y):
         f = lambda a: np.array(a).reshape(-1)
         x, y = map(f, [x, y])
-        self.assertEqual(x.dtype, y.dtype)
-        self.assertTrue(np.allclose(x - y, 0.0))
+        self.assertTrue(np.allclose(x - y, 0.0, atol=1e-5, rtol=0))
 
 
 class TestCaseReplayMemory(TestCaseCore):
     def fill(self, replay_memory):
         super().fill(replay_memory)
-        replay_memory._refresh(cache_size=9, train_frac=0.0, chunk_ids=[0, 3, 6])
+        replay_memory._refresh(train_frac=0.0, chunk_ids=[0, 3, 6])
 
     def test_1step(self):
-        m = NStepReplayMemory(size=20, history_len=1, discount=0.9, n=1)
-        m.config_cache(oversample=1.0, priority=0.0, chunk_size=3)
+        m = make_replay_memory('nstep-1', capacity=20, history_len=1, discount=0.9, cache_size=9, chunk_size=3, priority=0.0)
         self.fill(m)
 
         self.assertNumpyEqual(m.cached_obs,     [    0,     1,    2,     3,     4,    5,     6,     7,     8])
@@ -60,8 +58,7 @@ class TestCaseReplayMemory(TestCaseCore):
         self.assertNumpyEqual(m.cached_returns, [190.0, 260.0, 20.0, 250.0, 210.0, 60.0, 220.0, -40.0, 410.0])
 
     def test_nstep(self):
-        m = NStepReplayMemory(size=20, history_len=1, discount=0.9, n=3)
-        m.config_cache(oversample=1.0, priority=0.0, chunk_size=3)
+        m = make_replay_memory('nstep-3', capacity=20, history_len=1, discount=0.9, cache_size=9, chunk_size=3, priority=0.0)
         self.fill(m)
 
         self.assertNumpyEqual(m.cached_obs,     [   0,   1,    2,    3,    4,    5,   6,     7,     8])
@@ -69,8 +66,7 @@ class TestCaseReplayMemory(TestCaseCore):
         self.assertNumpyEqual(m.cached_returns, [17.2, 8.0, 20.0, 55.6, 84.0, 60.0, 4.0, -40.0, 410.0])
 
     def test_pengs_lambda(self):
-        m = LambdaReplayMemory(size=20, history_len=1, discount=0.9, lambd=0.8, use_watkins=False)
-        m.config_cache(oversample=1.0, priority=0.0, chunk_size=3)
+        m = make_replay_memory('pengs-0.8', capacity=20, history_len=1, discount=0.9, cache_size=9, chunk_size=3, priority=0.0)
         self.fill(m)
 
         self.assertNumpyEqual(m.cached_obs,     [     0,    1,    2,        3,     4,    5,    6,     7,     8])
@@ -78,8 +74,7 @@ class TestCaseReplayMemory(TestCaseCore):
         self.assertNumpyEqual(m.cached_returns, [88.048, 58.4, 20.0,  112.624, 109.2, 60.0, 47.2, -40.0, 410.0])
 
     def test_watkins_lambda(self):
-        m = LambdaReplayMemory(size=20, history_len=1, discount=0.9, lambd=0.8, use_watkins=True)
-        m.config_cache(oversample=1.0, priority=0.0, chunk_size=3)
+        m = make_replay_memory('watkins-0.8', capacity=20, history_len=1, discount=0.9, cache_size=9, chunk_size=3, priority=0.0)
         self.fill(m)
 
         self.assertNumpyEqual(m.cached_obs,     [    0,     1,    2,       3,     4,    5,    6,     7,     8])

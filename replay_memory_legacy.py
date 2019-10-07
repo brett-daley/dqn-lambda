@@ -1,5 +1,15 @@
 import numpy as np
+import re
+
 from replay_memory import NStepReplayMemory
+
+
+def make_legacy_replay_memory(return_type, history_len, capacity, discount):
+    match = re.match('nstep-([0-9]+)', return_type)
+    if not match:
+        raise ValueError('Legacy mode only supports n-step returns but requested {}'.format(return_type))
+    n = int(match.group(1))
+    return LegacyReplayMemory(capacity, history_len, discount, n)
 
 
 class LegacyReplayMemory(NStepReplayMemory):

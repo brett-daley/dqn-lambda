@@ -1,6 +1,6 @@
 import numpy as np
-from replay_memory_legacy import LegacyReplayMemory
 from tests.test_replay_memory import TestCaseCore
+from replay_memory_legacy import make_legacy_replay_memory
 
 
 class TestCaseLegacyReplayMemory(TestCaseCore):
@@ -11,7 +11,7 @@ class TestCaseLegacyReplayMemory(TestCaseCore):
         self.refresh = lambda s: refresh(s, None)[0]
 
     def test_1step(self):
-        m = LegacyReplayMemory(size=20, history_len=1, discount=0.9, n=1)
+        m = make_legacy_replay_memory('nstep-1', capacity=20, history_len=1, discount=0.9)
         self.fill(m)
         obs, actions, returns = m._sample(np.arange(0, 9))
 
@@ -20,7 +20,7 @@ class TestCaseLegacyReplayMemory(TestCaseCore):
         self.assertNumpyEqual(returns, [190.0, 260.0, 20.0, 250.0, 210.0, 60.0, 220.0, -40.0, 410.0])
 
     def test_nstep(self):
-        m = LegacyReplayMemory(size=20, history_len=1, discount=0.9, n=3)
+        m = make_legacy_replay_memory('nstep-3', capacity=20, history_len=1, discount=0.9)
         self.fill(m)
         obs, actions, returns = m._sample(np.arange(0, 7))
 

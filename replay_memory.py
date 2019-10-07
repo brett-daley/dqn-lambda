@@ -1,82 +1,44 @@
 import numpy as np
+import re
 
-
-def remove(string, prefix):
-    assert string.startswith(prefix)
-    return string[len(prefix):]
+from return_calculation import calculate_lambda_returns, calculate_nstep_returns
 
 
 def make_replay_memory(return_type, capacity, history_len, discount, cache_size, chunk_size, priority):
-    _return_type = return_type  # In case we raise an exception
     shared_args = (capacity, history_len, discount, cache_size, chunk_size, priority)
+    int_capture = r'([0-9]+)'
+    float_capture = r'([0-9]+\.[0-9]+)'
 
-    try:
-        if return_type.startswith('nstep-'):
-            return_type = remove(return_type, 'nstep-')
-            n = int(return_type)
-            return NStepReplayMemory(*shared_args, n)
+    match = re.match('nstep-' + int_capture, return_type)
+    if match:
+        n = int(match.group(1))
+        return NStepReplayMemory(*shared_args, n)
 
-        if return_type.startswith('pengs-'):
-            return_type = remove(return_type, 'pengs-')
-            use_watkins = False
-        elif return_type.startswith('watkins-'):
-            return_type = remove(return_type, 'watkins-')
-            use_watkins = True
-        else:
-            raise ValueError
+    match = re.match('pengs-' + float_capture, return_type)
+    if match:
+        lambd = float(match.group(1))
+        return LambdaReplayMemory(*shared_args, lambd, use_watkins=False)
 
-        if return_type == 'dynamic':
-            return DynamicLambdaReplayMemory(*shared_args, use_watkins)
+    match = re.match('watkins-' + float_capture, return_type)
+    if match:
+        lambd = float(match.group(1))
+        return LambdaReplayMemory(*shared_args, lambd, use_watkins=True)
 
-        lambd = float(return_type)
-        return LambdaReplayMemory(*shared_args, lambd, use_watkins)
+    if return_type == 'pengs-median':
+        return DynamicLambdaReplayMemory(*shared_args, use_watkins=False)
 
-    except:
-        raise ValueError('Unrecognized return type {}'.format(_return_type))
+    if return_type == 'watkins-median':
+        return DynamicLambdaReplayMemory(*shared_args, use_watkins=True)
 
+    match = re.match('pengs-maxtd-' + float_capture, return_type)
+    if match:
+        raise NotImplementedError
 
-def pad_axis0(array, value):
-    return np.pad(array, pad_width=(0,1), mode='constant', constant_values=value)
+    match = re.match('watkins-maxtd-' + float_capture, return_type)
+    if match:
+        raise NotImplementedError
 
-
-def shift(array):
-        return pad_axis0(array, 0)[1:]
-
-
-def calculate_lambda_returns(rewards, qvalues, dones, mask, discount, lambd):
-    dones = dones.astype(np.float32)
-    qvalues[-1] *= (1.0 - dones[-1])
-    lambda_returns = rewards + (discount * qvalues[1:])
-    for i in reversed(range(len(rewards) - 1)):
-        a = lambda_returns[i] + (discount * lambd * mask[i]) * (lambda_returns[i+1] - qvalues[i+1])
-        b = rewards[i]
-        lambda_returns[i] = (1.0 - dones[i]) * a + dones[i] * b
-    return lambda_returns
-
-
-def calculate_nstep_returns(rewards, qvalues, dones, discount, n):
-    # Counterintuitively, the bootstrap is treated is as a reward too
-    rewards = pad_axis0(rewards, qvalues[-1])
-    dones   = pad_axis0(dones, 1.0)
-
-    mask    = np.ones_like(rewards)
-    decay   = 1.0
-    returns = np.copy(rewards)
-
-    for i in range(n):
-        decay *= discount
-        mask *= (1.0 - dones)
-
-        rewards = shift(rewards)
-        qvalues = shift(qvalues)
-        dones   = shift(dones)
-
-        if i != (n-1):
-            returns += (mask * decay * rewards)
-        else:
-            returns += (mask * decay * qvalues)
-
-    return returns[:-1]  # Remove bootstrap placeholder
+    raise ValueError('Unrecognized return type {}'.format(return_type))
 
 
 class ReplayMemory:
@@ -241,7 +203,7 @@ class LambdaReplayMemory(ReplayMemory):
     def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins):
         self.lambd = lambd
         self.use_watkins = use_watkins
-        super().__init__(capacity, history_len, discount)
+        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
         if not self.use_watkins:
@@ -254,13 +216,13 @@ class DynamicLambdaReplayMemory(LambdaReplayMemory):
         lambd = None
         super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins)
 
-    def _calculate_returns(self, rewards, qvalues, dones, mask):
+    def _calculate_returns(self, rewards, qvalues, dones, mask, k=21):
         if not self.use_watkins:
             mask = np.ones_like(qvalues)
-        returns = np.empty(shape=[21, rewards.size], dtype=np.float32)
-        for n in range(0, 21):
-            lambd = n / 20.0
-            returns[n] = calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, lambd)
+        assert k > 1
+        returns = np.empty(shape=[k, rewards.size], dtype=np.float32)
+        for i in range(0, k):
+            returns[i] = calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, lambd=i/(k-1))
         return np.median(returns, axis=0)
 
 

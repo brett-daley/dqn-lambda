@@ -5,6 +5,8 @@ import dqn
 import utils
 from wrappers import monitor, wrap_deepmind
 from q_functions import *
+from replay_memory import make_replay_memory
+from replay_memory_legacy import make_legacy_replay_memory
 
 
 def make_atari_env(name, seed):
@@ -48,18 +50,13 @@ def main():
     replay_mem_size = 1000000
 
     if not args.legacy:
-        from replay_memory import make_replay_memory
         replay_memory = make_replay_memory(args.return_type, replay_mem_size, args.history_len, discount,
                                            args.cache_size, args.chunk_size, args.priority)
     else:
         assert args.cache_size == 80000      # Ensure cache-related args have not been set
         assert args.priority == 0.0
         assert args.chunk_size == 100
-        assert 'nstep-' in args.return_type  # Only n-step returns are supported
-
-        from replay_memory_legacy import LegacyReplayMemory
-        n = int( args.return_type.strip('nstep-') )
-        replay_memory = LegacyReplayMemory(replay_mem_size, args.history_len, discount, n=n)
+        replay_memory = make_legacy_replay_memory(args.return_type, replay_mem_size, args.history_len, discount)
 
     with utils.make_session(args.seed) as session:
         dqn.learn(
