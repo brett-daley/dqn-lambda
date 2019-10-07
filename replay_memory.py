@@ -25,18 +25,20 @@ def make_replay_memory(return_type, capacity, history_len, discount, cache_size,
         return LambdaReplayMemory(*shared_args, lambd, use_watkins=True)
 
     if return_type == 'pengs-median':
-        return DynamicLambdaReplayMemory(*shared_args, use_watkins=False)
+        return MedianLambdaReplayMemory(*shared_args, use_watkins=False)
 
     if return_type == 'watkins-median':
-        return DynamicLambdaReplayMemory(*shared_args, use_watkins=True)
+        return MedianLambdaReplayMemory(*shared_args, use_watkins=True)
 
     match = re.match('pengs-maxtd-' + float_capture, return_type)
     if match:
-        raise NotImplementedError
+        max_td = float(match.group(1))
+        return MeanSquaredTDLambdaReplayMemory(*shared_args, max_td, use_watkins=False)
 
     match = re.match('watkins-maxtd-' + float_capture, return_type)
     if match:
-        raise NotImplementedError
+        max_td = float(match.group(1))
+        return MeanSquaredTDLambdaReplayMemory(*shared_args, max_td, use_watkins=True)
 
     raise ValueError('Unrecognized return type {}'.format(return_type))
 
@@ -211,7 +213,7 @@ class LambdaReplayMemory(ReplayMemory):
         return calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, self.lambd)
 
 
-class DynamicLambdaReplayMemory(LambdaReplayMemory):
+class MedianLambdaReplayMemory(LambdaReplayMemory):
     def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, use_watkins):
         lambd = None
         super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins)
@@ -224,6 +226,47 @@ class DynamicLambdaReplayMemory(LambdaReplayMemory):
         for i in range(0, k):
             returns[i] = calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, lambd=i/(k-1))
         return np.median(returns, axis=0)
+
+
+class MeanSquaredTDLambdaReplayMemory(LambdaReplayMemory):
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, max_td, use_watkins):
+        lambd = None
+        self.max_td = max_td
+        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins)
+
+    def _calculate_returns(self, rewards, qvalues, dones, mask, k=7):
+        f = super()._calculate_returns  # Use parent function to compute returns
+
+        # Try the extremes first
+        returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd=1.0)
+        if ok:
+            return returns
+
+        returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd=0.0)
+        if not ok:
+            return returns
+
+        # If we haven't returned by now, we need to search for a good lambda value
+        best_returns = None
+        lambd = 0.5
+
+        for i in range(2, 2 + k):
+            returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd)
+
+            if ok:
+                best_returns = returns
+                lambd += 1.0 / (2.0 ** i)
+            else:
+                lambd -= 1.0 / (2.0 ** i)
+
+        return best_returns if best_returns is not None else returns
+
+    def _try_lambda(self, f, rewards, qvalues, dones, mask, lambd):
+        self.lambd = lambd  # Pass implicitly to parent function
+        returns = f(rewards, qvalues, dones, mask)
+        td_error = np.square(returns - qvalues[:-1]).mean()
+        ok = (td_error <= self.max_td)
+        return returns, ok
 
 
 class NStepReplayMemory(ReplayMemory):

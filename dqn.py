@@ -6,7 +6,6 @@ import time
 
 from utils import *
 from wrappers import HistoryWrapper
-from replay_memory import DynamicLambdaReplayMemory
 from replay_memory_legacy import LegacyReplayMemory
 
 
