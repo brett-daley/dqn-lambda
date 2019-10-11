@@ -116,7 +116,7 @@ class ReplayMemory:
         if self.obs is None:
             self.obs = np.empty([self.capacity, *obs.shape], dtype=obs.dtype)
         if self.cached_obs is None:
-            self.cached_obs = np.empty([self.cache_size, *obs.shape], dtype=obs.dtype)
+            self.cached_obs = np.empty([self.cache_size, self.history_len, *obs.shape], dtype=obs.dtype)
         self.obs[self.next] = obs
 
     def store_effect(self, action, reward, done):
@@ -144,28 +144,24 @@ class ReplayMemory:
         self._refresh(train_frac, chunk_ids)  # Separate function for unit testing
 
     def _refresh(self, train_frac, chunk_ids):
-        # Refresh the chunks we sampled
-        obs_chunks = [self._extract_chunk(None, i, obs=True) for i in chunk_ids]
-        action_chunks = [self._extract_chunk(self.actions, i) for i in chunk_ids]
-        reward_chunks = [self._extract_chunk(self.rewards, i) for i in chunk_ids]
-        done_chunks = [self._extract_chunk(self.dones, i) for i in chunk_ids]
+        # Refresh the chunks we sampled and load them into the cache
+        for k, i in enumerate(chunk_ids):
+            obs = self._extract_chunk(None, i, obs=True)
+            actions = self._extract_chunk(self.actions, i)
+            rewards = self._extract_chunk(self.rewards, i)
+            dones = self._extract_chunk(self.dones, i)
 
-        return_chunks = []
-        error_chunks = []
-        for obs, actions, rewards, dones in zip(obs_chunks, action_chunks, reward_chunks, done_chunks):
             max_qvalues, mask, onpolicy_qvalues = self.refresh_func(obs, actions)
-
             returns = self._calculate_returns(rewards, max_qvalues, dones, mask)
-            return_chunks.append(returns)
-
             errors = np.abs(returns - onpolicy_qvalues)
-            error_chunks.append(errors)
 
-        # Collect and store data
-        self.cached_obs = np.concatenate([c[:-1] for c in obs_chunks])
-        self.cached_actions = np.concatenate([c for c in action_chunks])
-        self.cached_returns = np.concatenate([c for c in return_chunks])
-        self.cached_errors = np.concatenate([c for c in error_chunks])
+            start = self.chunk_size * k
+            end = start + self.chunk_size
+
+            self.cached_obs[start:end] = obs[:-1]
+            self.cached_actions[start:end] = actions
+            self.cached_returns[start:end] = returns
+            self.cached_errors[start:end] = errors
 
         # Prioritize samples
         distr = self._prioritized_distribution(self.cached_errors, train_frac)
