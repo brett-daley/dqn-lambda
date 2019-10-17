@@ -7,6 +7,7 @@ import re
 import os
 import yaml
 from glob import glob
+import scipy.stats
 
 
 def get_realtime(text):
@@ -35,106 +36,82 @@ class AxisManager:
     def __init__(self, num_seeds, colors):
         self.num_seeds = num_seeds
         self.traces = {}
-        self.normalized = False
 
-    def add(self, trace, color):
-        self.traces[trace] = {'x': None, 'y': None, 'stderr': None, 'color': color, 'count': 0}
+    def create_trace(self, trace, color):
+        self.traces[trace] = {'filename': [], 'x': [], 'y': [], 'color': color}
 
-    def update(self, trace, x_axis, y_axis):
-        assert not self.normalized
-        assert x_axis.shape == y_axis.shape
+    def update_trace(self, trace, filename, x_axis, y_axis):
+        assert trace in self.traces.keys()
+        names = self.traces[trace]['filename']
+        x = self.traces[trace]['x']
+        y = self.traces[trace]['y']
 
-        try:
-            self._increment(trace, 'x', x_axis)
-            self._increment(trace, 'y', y_axis)
-            self._increment(trace, 'stderr', np.square(y_axis))
-            self._increment(trace, 'count', 1)
-        except ValueError:
-            print('  Warning: corrupted data, attempting to skip file')
+        assert filename not in names
+        if len(names) > 0 and x[0].shape != x_axis.shape:
+            print(f'  Warning: {os.path.basename(filename)} shape {x_axis.shape} does not match shape {x[0].shape}; file might be corrupted. Skipping...')
+            return False
 
-    def _increment(self, trace, key, value):
-        d = self.traces[trace]
-        if d[key] is None:
-            d[key] = np.zeros_like(value)
-        d[key] += value
+        names.append(filename)
+        x.append(x_axis)
+        y.append(y_axis)
 
     def iter_traces(self):
-        assert self.normalized
         for trace, attr in self.traces.items():
-            yield trace, attr['color']
+            x, y, color = np.asarray(attr['x']), np.asarray(attr['y']), attr['color']
+            assert len(x) == len(y) != 0
+            n = len(x)
 
-    def axes(self, trace):
-        assert self.normalized
-        d = self.traces[trace]
-        return d['x'], d['y'], d['stderr']
+            x_mean = np.mean(x, axis=0)
+            y_mean = np.mean(y, axis=0)
+            if n > 1:
+                y_error = scipy.stats.sem(y, axis=0)
+                #y_error = np.std(y, axis=0)
+            else:
+                y_error = np.zeros_like(y_mean)
 
-    def ylim(self):
-        assert self.normalized
-        raise NotImplementedError
-        # TODO: Implement auto-sized y-axis
-
-    def normalize(self):
-        assert not self.normalized
-        n = self.num_seeds
-
-        for trace in self.traces.keys():
-            d = self.traces[trace]
-
-            if d['count'] != n:
-                print('  {} found only {} seed(s) out of {}'.format(trace, d['count'], n))
-                #raise AssertionError('  {} found only {} seed(s) but needs {}'.format(trace, d['count'], n))
-                n = d['count']
-
-            if n == 0:
-                raise AssertionError
-
-            d['x'] /= n
-            d['y'] /= n
-            d['stderr'] = (d['stderr'] / n) - np.square(d['y'])
-            d['stderr'] = np.sqrt(d['stderr']) #/ np.sqrt(n)
-
-        self.normalized = True
+            yield trace, x_mean, y_mean, y_error, n, color
 
 
 def create_plot(input_dir, output_dir, filename, title, traces, colors, legend, ylim, num_timesteps, num_seeds, downsample, realtime):
     axis_manager = AxisManager(num_seeds, colors)
 
-    try:
-        for trace, color in zip(traces, colors):
-            axis_manager.add(trace, color)
-            files = glob(os.path.join(input_dir, trace))
+    for trace, color in zip(traces, colors):
+        axis_manager.create_trace(trace, color)
+        files = glob(os.path.join(input_dir, trace))
 
-            for f in files:
-                x_axis, y_axis = axes_from_file(f, downsample, realtime)
-                axis_manager.update(trace, x_axis, y_axis)
-
-        axis_manager.normalize()
-
-    except Exception as e:
-        print('  Could not generate plot:', e)
-        return False
+        for f in files:
+            x_axis, y_axis = axes_from_file(f, downsample, realtime)
+            axis_manager.update_trace(trace, f, x_axis, y_axis)
 
     plt.figure()
     plt.rc('xtick', labelsize=16)
     plt.rc('ytick', labelsize=16)
 
     x_max = -float('inf')
-    for i, (trace, color) in enumerate(axis_manager.iter_traces()):
-        x_axis, y_axis, stderr = axis_manager.axes(trace)
-        plt.plot(x_axis, y_axis, color, label=legend[i])
-        plt.fill_between(x_axis, (y_axis - stderr), (y_axis + stderr), color=color, alpha=0.25, linewidth=0)
-        x_max = max(x_max, np.max(x_axis))
+    y0_min = float('inf')
+    for i, (trace, x, y, error, n, color) in enumerate(axis_manager.iter_traces()):
+        if n == 0:
+            print(f'  Error: {trace} found 0 seeds')
+            return False
+        if n < num_seeds:
+            print(f'  Warning: {trace} found only {n} seed(s) out of {num_seeds}')
+
+        plt.plot(x, y, color, label=legend[i])
+        plt.fill_between(x, (y - error), (y + error), color=color, alpha=0.25, linewidth=0)
+        x_max = max(x_max, np.max(x))
+        y0_min = min(y0_min, np.min(y - error))
 
     plt.title(title, fontsize=20)
-    #plt.grid(b=True, which='major', axis='both')
     plt.grid(b=True, which='both', axis='both')
     plt.legend(loc='best', framealpha=1.0, fontsize=12)
+
+    ax = matplotlib.pyplot.gca()
 
     plt.xlim([0, x_max if realtime else num_timesteps])
     if ylim is not None:
         plt.ylim(ylim)
-
-    ax = matplotlib.pyplot.gca()
+    elif y0_min > 0.0:
+        plt.ylim(0.0, ax.get_ylim()[1])
 
     if not realtime:
         f = lambda x, pos: str(int(x * 1e-6)) + ('M' if x > 0 else '')
@@ -153,7 +130,7 @@ def create_plot(input_dir, output_dir, filename, title, traces, colors, legend, 
     fig.set_size_inches(6.4, 6.4)
     m = 0.0725  # all-around margin
     s = 0.03    # left-right shift
-    plt.subplots_adjust(left=m + s, bottom=m, right=1-m + s, top=1-m)
+    plt.subplots_adjust(left=m + s + 0.02, bottom=m, right=1-m + s, top=1-m)
     plt.savefig(path + '.png', format='png')
     #fig.savefig(path + '.pdf', format='pdf')
     print('  Plot saved as', path)
@@ -199,7 +176,7 @@ def main():
                 n_success += 1
             print(flush=True)
 
-    print('Generated {}/{} plots.'.format(n_success, n_total))
+    print(f'Generated {n_success}/{n_total} plots.')
 
 
 if __name__ == '__main__':

@@ -1,51 +1,30 @@
 ---
-fig-0a:
-  num_seeds: 5
-  num_timesteps: 2000000
-  downsample: 80
-  legend: [3-step, $\delta=0.02$]
-  colors: [green, red]
-  ylim: [-21, 21]
-  filenames:
-    - dynamic-lambda
-  plots:
-    Dynamic $\lambda$ Selection:
-      - dqn_len-4_pong_nstep-3_oversample-1.5_priority-0.0_seed-*
-      - dqn_len-4_pong_pengs-dynamic-0.02_oversample-1.0_priority-0.0_seed-*
-
-fig-0b:
-  num_seeds: 5
-  num_timesteps: 2000000
-  downsample: 80
-  legend: [$X=1.5$, $X=2.5$]
-  colors: [green, red]
-  ylim: [-21, 21]
-  filenames:
-    - oversampling
-  plots:
-    Oversampling:
-      - dqn_len-4_pong_nstep-3_oversample-1.5_priority-0.0_seed-*
-      - dqn_len-4_pong_nstep-3_oversample-2.5_priority-0.0_seed-*
-
-fig-0c:
-  num_seeds: 5
-  num_timesteps: 2000000
-  downsample: 80
-  legend: ['$p=0$', '$p=0.4$']
-  colors: [green, red]
-  ylim: [-21, 21]
-  filenames:
-    - prioritization
-  plots:
-    Direct Prioritization:
-      - dqn_len-4_pong_nstep-3_oversample-2.5_priority-0.0_seed-*
-      - dqn_len-4_pong_nstep-3_oversample-2.5_priority-0.4_seed-*
-
-fig1:
-  num_seeds: 5
+ablation:
+  num_seeds: 10
   num_timesteps: 10000000
   downsample: 80
-  legend: [3-step DQN, DQN(0.25), DQN(0.5), DQN(0.75), DQN(1)]
+  legend: [No Cache, $S=80000$, $S=160000$, $S=240000$]
+  colors: [black, green, red, blue]
+  filenames:
+    - ablation_seaquest
+    - ablation_space-invaders
+  plots:
+    Seaquest:
+      - dqn-legacy_len-4_seaquest_nstep-3_seed-*
+      - dqn_len-4_seaquest_nstep-3_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_seaquest_nstep-3_cache-size-160000_priority-0.0_seed-*
+      - dqn_len-4_seaquest_nstep-3_cache-size-240000_priority-0.0_seed-*
+    Space Invaders:
+      - dqn-legacy_len-4_space-invaders_nstep-3_seed-*
+      - dqn_len-4_space-invaders_nstep-3_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_nstep-3_cache-size-160000_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_nstep-3_cache-size-240000_priority-0.0_seed-*
+
+pengs-lambda-sweep:
+  num_seeds: 10
+  num_timesteps: 10000000
+  downsample: 80
+  legend: [3-step DQN, DQN($0.25$), DQN($0.5$), DQN($0.75$), DQN($1$)]
   colors: [black, blue, green, red, purple]
   filenames:
     - dqn_len-4_beam-rider_pengs
@@ -57,46 +36,46 @@ fig1:
   plots:
     Beam Rider:
       - dqn-legacy_len-4_beam-rider_nstep-3_seed-*
-      - dqn_len-4_beam-rider_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_beam-rider_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_beam-rider_pengs-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_beam-rider_pengs-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_beam-rider_pengs-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_beam-rider_pengs-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_beam-rider_pengs-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_beam-rider_pengs-1.0_cache-size-80000_priority-0.0_seed-*
     Breakout:
       - dqn-legacy_len-4_breakout_nstep-3_seed-*
-      - dqn_len-4_breakout_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_breakout_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_breakout_pengs-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_breakout_pengs-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_breakout_pengs-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_breakout_pengs-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_breakout_pengs-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_breakout_pengs-1.0_cache-size-80000_priority-0.0_seed-*
     Pong:
       - dqn-legacy_len-4_pong_nstep-3_seed-*
-      - dqn_len-4_pong_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_pong_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_pong_pengs-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_pong_pengs-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_pong_pengs-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_pong_pengs-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_pong_pengs-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_pong_pengs-1.0_cache-size-80000_priority-0.0_seed-*
     Q*Bert:
       - dqn-legacy_len-4_qbert_nstep-3_seed-*
-      - dqn_len-4_qbert_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_qbert_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_qbert_pengs-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_qbert_pengs-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_qbert_pengs-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_qbert_pengs-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_qbert_pengs-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_qbert_pengs-1.0_cache-size-80000_priority-0.0_seed-*
     Seaquest:
       - dqn-legacy_len-4_seaquest_nstep-3_seed-*
-      - dqn_len-4_seaquest_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_seaquest_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_seaquest_pengs-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_seaquest_pengs-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_seaquest_pengs-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_seaquest_pengs-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_seaquest_pengs-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_seaquest_pengs-1.0_cache-size-80000_priority-0.0_seed-*
     Space Invaders:
       - dqn-legacy_len-4_space-invaders_nstep-3_seed-*
-      - dqn_len-4_space-invaders_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_space-invaders_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_space-invaders_pengs-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_space-invaders_pengs-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_pengs-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_pengs-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_pengs-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_pengs-1.0_cache-size-80000_priority-0.0_seed-*
 
-fig2:
-  num_seeds: 5
+watkins-lambda-sweep:
+  num_seeds: 10
   num_timesteps: 10000000
   downsample: 80
-  legend: [3-step DQN, DQN(0.25), DQN(0.5), DQN(0.75), DQN(1)]
+  legend: [3-step DQN, DQN($0.25$), DQN($0.5$), DQN($0.75$), DQN($1$)]
   colors: [black, blue, green, red, purple]
   filenames:
     - dqn_len-4_beam-rider_watkins
@@ -108,183 +87,192 @@ fig2:
   plots:
     Beam Rider:
       - dqn-legacy_len-4_beam-rider_nstep-3_seed-*
-      - dqn_len-4_beam-rider_watkins-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_beam-rider_watkins-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_beam-rider_watkins-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_beam-rider_watkins-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_beam-rider_watkins-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_beam-rider_watkins-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_beam-rider_watkins-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_beam-rider_watkins-1.0_cache-size-80000_priority-0.0_seed-*
     Breakout:
       - dqn-legacy_len-4_breakout_nstep-3_seed-*
-      - dqn_len-4_breakout_watkins-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_breakout_watkins-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_breakout_watkins-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_breakout_watkins-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_breakout_watkins-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_breakout_watkins-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_breakout_watkins-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_breakout_watkins-1.0_cache-size-80000_priority-0.0_seed-*
     Pong:
       - dqn-legacy_len-4_pong_nstep-3_seed-*
-      - dqn_len-4_pong_watkins-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_pong_watkins-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_pong_watkins-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_pong_watkins-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_pong_watkins-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_pong_watkins-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_pong_watkins-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_pong_watkins-1.0_cache-size-80000_priority-0.0_seed-*
     Q*Bert:
       - dqn-legacy_len-4_qbert_nstep-3_seed-*
-      - dqn_len-4_qbert_watkins-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_qbert_watkins-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_qbert_watkins-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_qbert_watkins-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_qbert_watkins-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_qbert_watkins-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_qbert_watkins-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_qbert_watkins-1.0_cache-size-80000_priority-0.0_seed-*
     Seaquest:
       - dqn-legacy_len-4_seaquest_nstep-3_seed-*
-      - dqn_len-4_seaquest_watkins-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_seaquest_watkins-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_seaquest_watkins-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_seaquest_watkins-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_seaquest_watkins-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_seaquest_watkins-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_seaquest_watkins-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_seaquest_watkins-1.0_cache-size-80000_priority-0.0_seed-*
     Space Invaders:
       - dqn-legacy_len-4_space-invaders_nstep-3_seed-*
-      - dqn_len-4_space-invaders_watkins-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_space-invaders_watkins-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_space-invaders_watkins-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_space-invaders_watkins-1.0_oversample-1.0_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_watkins-0.25_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_watkins-0.5_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_watkins-0.75_cache-size-80000_priority-0.0_seed-*
+      - dqn_len-4_space-invaders_watkins-1.0_cache-size-80000_priority-0.0_seed-*
 
-fig3:
-  num_seeds: 5
+median-showcase:
+  num_seeds: 10
   num_timesteps: 10000000
   downsample: 80
-  legend: [3-step DQN, DQN($\lambda$)]
+  legend: [3-step DQN, DQN($\lambda$) (median)]
   colors: [black, blue]
   filenames:
-    - dqn_len-4_beam-rider_dynamic
-    - dqn_len-4_breakout_dynamic
-    - dqn_len-4_pong_dynamic
-    - dqn_len-4_qbert_dynamic
-    - dqn_len-4_seaquest_dynamic
-    - dqn_len-4_space-invaders_dynamic
+    - dqn_len-4_beam-rider_median
+    - dqn_len-4_breakout_median
+    - dqn_len-4_pong_median
+    - dqn_len-4_qbert_median
+    - dqn_len-4_seaquest_median
+    - dqn_len-4_space-invaders_median
   plots:
     Beam Rider:
       - dqn-legacy_len-4_beam-rider_nstep-3_seed-*
-      #- dqn_len-4_beam-rider_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_beam-rider_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_beam-rider_pengs-median_cache-size-80000_priority-0.1_seed-*
     Breakout:
       - dqn-legacy_len-4_breakout_nstep-3_seed-*
-      #- dqn_len-4_breakout_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_breakout_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_breakout_pengs-median_cache-size-80000_priority-0.1_seed-*
     Pong:
       - dqn-legacy_len-4_pong_nstep-3_seed-*
-      #- dqn_len-4_pong_pengs-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_pong_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_pong_pengs-median_cache-size-80000_priority-0.1_seed-*
     Q*Bert:
       - dqn-legacy_len-4_qbert_nstep-3_seed-*
-      #- dqn_len-4_qbert_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_qbert_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_qbert_pengs-median_cache-size-80000_priority-0.1_seed-*
     Seaquest:
       - dqn-legacy_len-4_seaquest_nstep-3_seed-*
-      #- dqn_len-4_seaquest_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_seaquest_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_seaquest_pengs-median_cache-size-80000_priority-0.1_seed-*
     Space Invaders:
       - dqn-legacy_len-4_space-invaders_nstep-3_seed-*
-      #- dqn_len-4_space-invaders_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_space-invaders_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_space-invaders_pengs-median_cache-size-80000_priority-0.1_seed-*
 
-fig4a:
-  num_seeds: 5
+maxtd-showcase:
+  num_seeds: 10
   num_timesteps: 10000000
   downsample: 80
-  legend: [DQN, DQN($\lambda$)]
+  legend: [3-step DQN, 'DQN($\lambda$) ($\bar{\delta}=0.025)$']
   colors: [black, blue]
   filenames:
-    - dqn_len-1_beam-rider_dynamic
-    - dqn_len-1_breakout_dynamic
-    - dqn_len-1_pong_dynamic
-    - dqn_len-1_qbert_dynamic
-    - dqn_len-1_seaquest_dynamic
-    - dqn_len-1_space-invaders_dynamic
+    - dqn_len-4_beam-rider_maxtd
+    - dqn_len-4_breakout_maxtd
+    - dqn_len-4_pong_maxtd
+    - dqn_len-4_qbert_maxtd
+    - dqn_len-4_seaquest_maxtd
+    - dqn_len-4_space-invaders_maxtd
+  plots:
+    Beam Rider:
+      - dqn-legacy_len-4_beam-rider_nstep-3_seed-*
+      - dqn_len-4_beam-rider_pengs-maxtd-0.025_cache-size-80000_priority-0.1_seed-*
+    Breakout:
+      - dqn-legacy_len-4_breakout_nstep-3_seed-*
+      - dqn_len-4_breakout_pengs-maxtd-0.025_cache-size-80000_priority-0.1_seed-*
+    Pong:
+      - dqn-legacy_len-4_pong_nstep-3_seed-*
+      - dqn_len-4_pong_pengs-maxtd-0.025_cache-size-80000_priority-0.1_seed-*
+    Q*Bert:
+      - dqn-legacy_len-4_qbert_nstep-3_seed-*
+      - dqn_len-4_qbert_pengs-maxtd-0.025_cache-size-80000_priority-0.1_seed-*
+    Seaquest:
+      - dqn-legacy_len-4_seaquest_nstep-3_seed-*
+      - dqn_len-4_seaquest_pengs-maxtd-0.025_cache-size-80000_priority-0.1_seed-*
+    Space Invaders:
+      - dqn-legacy_len-4_space-invaders_nstep-3_seed-*
+      - dqn_len-4_space-invaders_pengs-maxtd-0.025_cache-size-80000_priority-0.1_seed-*
+
+pomdp-showcase:
+  num_seeds: 10
+  num_timesteps: 10000000
+  downsample: 80
+  legend: [3-step DQN, DQN($\lambda$) (median)]
+  colors: [black, blue]
+  filenames:
+    - dqn_len-1_beam-rider_median
+    - dqn_len-1_breakout_median
+    - dqn_len-1_pong_median
+    - dqn_len-1_qbert_median
+    - dqn_len-1_seaquest_median
+    - dqn_len-1_space-invaders_median
   plots:
     Beam Rider:
       - dqn-legacy_len-1_beam-rider_nstep-3_seed-*
-      - dqn_len-1_beam-rider_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-1_beam-rider_pengs-median_cache-size-80000_priority-0.1_seed-*
     Breakout:
       - dqn-legacy_len-1_breakout_nstep-3_seed-*
-      - dqn_len-1_breakout_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-1_breakout_pengs-median_cache-size-80000_priority-0.1_seed-*
     Pong:
       - dqn-legacy_len-1_pong_nstep-3_seed-*
-      - dqn_len-1_pong_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-1_pong_pengs-median_cache-size-80000_priority-0.1_seed-*
     Q*Bert:
       - dqn-legacy_len-1_qbert_nstep-3_seed-*
-      - dqn_len-1_qbert_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-1_qbert_pengs-median_cache-size-80000_priority-0.1_seed-*
     Seaquest:
       - dqn-legacy_len-1_seaquest_nstep-3_seed-*
-      - dqn_len-1_seaquest_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-1_seaquest_pengs-median_cache-size-80000_priority-0.1_seed-*
     Space Invaders:
       - dqn-legacy_len-1_space-invaders_nstep-3_seed-*
-      - dqn_len-1_space-invaders_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-1_space-invaders_pengs-median_cache-size-80000_priority-0.1_seed-*
 
-# fig4b:
-#   num_seeds: 5
-#   num_timesteps: 10000000
-#   downsample: 80
-#   legend: [DQN, DQN($\lambda$)]
-#   colors: [black, purple]
-#   filenames:
-#     - drqn_len-4_beam-rider_dynamic
-#     - drqn_len-4_breakout_dynamic
-#     - drqn_len-4_pong_dynamic
-#     - drqn_len-4_qbert_dynamic
-#     - drqn_len-4_seaquest_dynamic
-#     - drqn_len-4_space-invaders_dynamic
-#   plots:
-#     Beam Rider:
-#       - drqn-legacy_len-4_beam-rider_nstep-3_seed-*
-#       - drqn_len-4_beam-rider_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-#     Breakout:
-#       - drqn-legacy_len-4_breakout_nstep-3_seed-*
-#       - drqn_len-4_breakout_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-#     Pong:
-#       - drqn-legacy_len-4_pong_nstep-3_seed-*
-#       - drqn_len-4_pong_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-#     Q*Bert:
-#       - drqn-legacy_len-4_qbert_nstep-3_seed-*
-#       - drqn_len-4_qbert_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-#     Seaquest:
-#       - drqn-legacy_len-4_seaquest_nstep-3_seed-*
-#       - drqn_len-4_seaquest_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-#     Space Invaders:
-#       - drqn-legacy_len-4_space-invaders_nstep-3_seed-*
-#       - drqn_len-4_space-invaders_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-
-fig5:
+realtime-0:
   realtime: true
-  num_seeds: 5
+  num_seeds: 10
   num_timesteps: 10000000
   downsample: 80
-  legend: [3-step DQN, DQN($\lambda$)]
+  legend: [3-step DQN, DQN($0.25$)]
   colors: [black, blue]
   filenames:
-    - dqn_len-4_beam-rider_realtime
     - dqn_len-4_breakout_realtime
-    - dqn_len-4_pong_realtime
+    - dqn_len-4_space-invaders_realtime
+  plots:
+    Breakout:
+      - dqn-legacy_len-4_breakout_nstep-3_seed-*
+      - dqn_len-4_breakout_pengs-0.25_cache-size-80000_priority-0.0_seed-*
+    Space Invaders:
+      - dqn-legacy_len-4_space-invaders_nstep-3_seed-*
+      - dqn_len-4_space-invaders_pengs-0.25_cache-size-80000_priority-0.0_seed-*
+
+realtime-1:
+  realtime: true
+  num_seeds: 10
+  num_timesteps: 10000000
+  downsample: 80
+  legend: [3-step DQN, DQN($0.5$)]
+  colors: [black, green]
+  filenames:
+    - dqn_len-4_beam-rider_realtime
     - dqn_len-4_qbert_realtime
     - dqn_len-4_seaquest_realtime
-    - dqn_len-4_space-invaders_realtime
   plots:
     Beam Rider:
       - dqn-legacy_len-4_beam-rider_nstep-3_seed-*
-      #- dqn_len-4_beam-rider_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_beam-rider_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-    Breakout:
-      - dqn-legacy_len-4_breakout_nstep-3_seed-*
-      #- dqn_len-4_breakout_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_breakout_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-    Pong:
-      - dqn-legacy_len-4_pong_nstep-3_seed-*
-      #- dqn_len-4_pong_pengs-0.75_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_pong_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_beam-rider_pengs-0.5_cache-size-80000_priority-0.0_seed-*
     Q*Bert:
       - dqn-legacy_len-4_qbert_nstep-3_seed-*
-      #- dqn_len-4_qbert_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_qbert_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_qbert_pengs-0.5_cache-size-80000_priority-0.0_seed-*
     Seaquest:
       - dqn-legacy_len-4_seaquest_nstep-3_seed-*
-      #- dqn_len-4_seaquest_pengs-0.5_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_seaquest_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
-    Space Invaders:
-      - dqn-legacy_len-4_space-invaders_nstep-3_seed-*
-      #- dqn_len-4_space-invaders_pengs-0.25_oversample-1.0_priority-0.0_seed-*
-      - dqn_len-4_space-invaders_pengs-dynamic-0.02_oversample-2.5_priority-0.4_seed-*
+      - dqn_len-4_seaquest_pengs-0.5_cache-size-80000_priority-0.0_seed-*
+
+realtime-2:
+  realtime: true
+  num_seeds: 10
+  num_timesteps: 10000000
+  downsample: 80
+  legend: [3-step DQN, DQN($0.75$)]
+  colors: [black, red]
+  filenames:
+    - dqn_len-4_pong_realtime
+    - dqn_len-4_qbert_realtime
+  plots:
+    Pong:
+      - dqn-legacy_len-4_pong_nstep-3_seed-*
+      - dqn_len-4_pong_pengs-0.75_cache-size-80000_priority-0.0_seed-*
 ...

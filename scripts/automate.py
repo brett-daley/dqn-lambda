@@ -49,7 +49,7 @@ class GPUArray:
             return 0
 
 
-def make_filename(env, legacy, history_len, recurrent, return_type, oversample, priority, seed):
+def make_filename(env, legacy, history_len, recurrent, return_type, cache_size, priority, seed):
     if not legacy:
         filename = ['drqn' if recurrent else 'dqn']
     else:
@@ -57,15 +57,15 @@ def make_filename(env, legacy, history_len, recurrent, return_type, oversample, 
     filename += ['len-' + str(history_len)]
     filename += [env.replace('_', '-')]
     filename += [return_type]
-    if oversample is not None:
-        filename += ['oversample-' + str(oversample)]
+    if cache_size is not None:
+        filename += ['cache-size-' + str(cache_size)]
     if priority is not None:
         filename += ['priority-' + str(priority)]
     filename += ['seed-' + str(seed)]
     return '_'.join(filename)
 
 
-def make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, oversample, priority, seed):
+def make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, cache_size, priority, seed):
     cmd  = ['python', 'run_dqn_atari.py']
     cmd += ['--env', env]
     cmd += ['--timesteps', str(timesteps)]
@@ -75,7 +75,7 @@ def make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, oversa
     cmd += ['--return-type', return_type]
     cmd += ['--seed', str(seed)]
     if not legacy:
-        cmd += ['--oversample', str(oversample)]
+        cmd += ['--cache-size', str(cache_size)]
         cmd += ['--priority', str(priority)]
     else:
         cmd += ['--legacy']
@@ -90,17 +90,17 @@ def make_joblist(experiments):
         recurrent = exp.get('recurrent', False)
 
         legacy = exp.get('legacy', False)
-        oversample = exp['oversample'] if not legacy else [None]
+        cache_size = exp['cache_size'] if not legacy else [None]
         priority = exp['priority'] if not legacy else [None]
 
         for env in exp['env']:
             for history_len in exp['history_len']:
                 for return_type in exp['return_type']:
-                    for x in oversample:
+                    for x in cache_size:
                         for p in priority:
                             for s in range(num_seeds):
-                                cmd = make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, oversample=x, priority=p, seed=s)
-                                filename = make_filename(env, legacy, history_len, recurrent, return_type, oversample=x, priority=p, seed=s)
+                                cmd = make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, cache_size=x, priority=p, seed=s)
+                                filename = make_filename(env, legacy, history_len, recurrent, return_type, cache_size=x, priority=p, seed=s)
                                 path = os.path.join(args.outdir, filename)
                                 jobs.append((cmd, path))
     return jobs
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
-    experiments = config.values() if args.target == 'all' else config[args.target]
+    experiments = config.values() if args.target == 'all' else [config[args.target]]
     jobs = make_joblist(experiments)
 
     gpu_array = GPUArray(args.procs_per_gpu)
