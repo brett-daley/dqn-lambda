@@ -162,7 +162,7 @@ def learn(session,
                 if t % target_update_freq == 0:
                     replay_memory.refresh(train_frac)
 
-                    num_train_iterations = target_update_freq // learning_freq
+                    num_train_iterations = replay_memory.cache_size // batch_size
                     for _ in range(num_train_iterations):
                         train()
             else:
