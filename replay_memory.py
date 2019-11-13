@@ -1,236 +1,274 @@
 import numpy as np
+import re
+
+from return_calculation import calculate_lambda_returns, calculate_nstep_returns
 
 
-def make_replay_memory(return_type, history_len, size, discount):
-    if 'nstep-' in return_type:
-        n = int( return_type.strip('nstep-') )
-        replay_memory = NStepReplayMemory(size, history_len, discount, nsteps=n)
+def make_replay_memory(return_type, capacity, history_len, discount, cache_size, chunk_size, priority):
+    shared_args = (capacity, history_len, discount, cache_size, chunk_size, priority)
+    int_capture = r'([0-9]+)'
+    float_capture = r'([0-9]+\.[0-9]+)'
 
-    elif 'renorm-pengs-' in return_type:
-        lambd = float( return_type.strip('renorm-pengs-') )
-        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=True, use_watkins=False)
+    match = re.match('nstep-' + int_capture, return_type)
+    if match:
+        n = int(match.group(1))
+        return NStepReplayMemory(*shared_args, n)
 
-    elif 'pengs-' in return_type:
-        lambd = float( return_type.strip('pengs-') )
-        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=False, use_watkins=False)
+    match = re.match('pengs-' + float_capture, return_type)
+    if match:
+        lambd = float(match.group(1))
+        return LambdaReplayMemory(*shared_args, lambd, use_watkins=False)
 
-    elif 'renorm-watkins-' in return_type:
-        lambd = float( return_type.strip('renorm-watkins-') )
-        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=True, use_watkins=True)
+    match = re.match('watkins-' + float_capture, return_type)
+    if match:
+        lambd = float(match.group(1))
+        return LambdaReplayMemory(*shared_args, lambd, use_watkins=True)
 
-    elif 'watkins-' in return_type:
-        lambd = float( return_type.strip('watkins-') )
-        replay_memory = LambdaReplayMemory(size, history_len, discount, lambd, renormalize=False, use_watkins=True)
+    if return_type == 'pengs-median':
+        return MedianLambdaReplayMemory(*shared_args, use_watkins=False)
 
-    else:
-        raise ValueError('Unrecognized return type')
+    if return_type == 'watkins-median':
+        return MedianLambdaReplayMemory(*shared_args, use_watkins=True)
 
-    return replay_memory
+    match = re.match('pengs-maxtd-' + float_capture, return_type)
+    if match:
+        max_td = float(match.group(1))
+        return MeanSquaredTDLambdaReplayMemory(*shared_args, max_td, use_watkins=False)
 
+    match = re.match('watkins-maxtd-' + float_capture, return_type)
+    if match:
+        max_td = float(match.group(1))
+        return MeanSquaredTDLambdaReplayMemory(*shared_args, max_td, use_watkins=True)
 
-class Episode:
-    def __init__(self, history_len, discount, refresh_func):
-        self.finished = False
-        self.history_len = history_len
-
-        self.discount = discount
-        self.refresh_func = refresh_func
-
-        self.obs     = []
-        self.action  = []
-        self.reward  = []
-        self.returns = None
-
-        self.length = 0
-
-    def store_frame(self, obs):
-        self.obs.append(obs)
-        self.length += 1
-
-    def store_effect(self, action, reward):
-        self.action.append(action)
-        self.reward.append(reward)
-
-    def finish(self):
-        assert not self.finished
-        self.finished = True
-
-        self.obs = np.stack(self.obs)
-        self.action = np.array(self.action)
-        self.reward = np.array(self.reward)
-
-    def refresh(self):
-        obs = np.array([self._encode_observation(i) for i in range(self.length)])
-        qvalues, mask = self.refresh_func(obs, self.action)
-        self.returns = self._calculate_returns(self.reward, qvalues, mask, self.discount)
-
-    def _calculate_returns(self, rewards, qvalues, mask, discount):
-        raise NotImplementedError
-
-    def sample(self):
-        i = np.random.randint(self.length)
-        return (self._encode_observation(i), self.action[i], self.returns[i])
-
-    def _encode_observation(self, idx):
-        end = (idx % self.length) + 1 # make noninclusive
-        start = end - self.history_len
-
-        pad_len = max(0, -start)
-        padding = [np.zeros_like(self.obs[0]) for _ in range(pad_len)]
-
-        start = max(0, start)
-        obs = [x for x in self.obs[start:end]]
-
-        return np.array(padding + obs)
-
-
-def shifted(array, k):
-    '''Shifts array left by k elements and pads with zeros'''
-    return np.pad(array, (0, k), mode='constant')[k:]
-
-
-def calculate_lambda_returns(rewards, qvalues, mask, discount, lambd):
-    next_qvalues = shifted(qvalues, 1)  # Final state in episode is terminal
-    lambda_returns = rewards + (discount * next_qvalues)
-    for i in reversed(range(len(rewards) - 1)):
-        lambda_returns[i] += (discount * lambd * mask[i]) * (lambda_returns[i+1] - next_qvalues[i])
-    return lambda_returns
-
-
-def calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, lambd):
-    def k(n):
-        if n == 0:
-            return 1.0
-        return (1.0 - lambd**n) / (1.0 - lambd)
-
-    next_qvalues = shifted(qvalues, 1)  # Final state in episode is terminal
-    lambda_returns = rewards + (discount * next_qvalues)
-
-    n = 1
-    for i in reversed(range(len(rewards) - 1)):
-        l = lambd * mask[i]
-        n = (n * int(mask[i])) + 1
-        lambda_returns[i] = (1. / k(n)) * (lambda_returns[i] + l * k(n-1) * (rewards[i] + discount * lambda_returns[i+1]))
-    return lambda_returns
-
-
-def calculate_nstep_returns(rewards, qvalues, discount, nsteps):
-    mask = np.ones_like(qvalues)
-    mc_returns = calculate_lambda_returns(rewards, qvalues, mask, discount, lambd=1.0)
-    nstep_returns = mc_returns - (discount ** nsteps) * (shifted(mc_returns, nsteps) - shifted(qvalues, nsteps))
-    return nstep_returns
-
-
-class LambdaEpisode(Episode):
-    def __init__(self, history_len, discount, Lambda, renormalize, use_watkins, refresh_func):
-        self.Lambda = Lambda
-        self.renormalize = renormalize
-        self.use_watkins = use_watkins
-        super().__init__(history_len, discount, refresh_func)
-
-    def _calculate_returns(self, rewards, qvalues, mask, discount):
-        if not self.use_watkins:
-            mask = np.ones_like(qvalues)
-        if self.renormalize:
-            return calculate_renormalized_lambda_returns(rewards, qvalues, mask, discount, self.Lambda)
-        return calculate_lambda_returns(rewards, qvalues, mask, discount, self.Lambda)
-
-
-class NStepEpisode(Episode):
-    def __init__(self, history_len, discount, nsteps, refresh_func):
-        self.nsteps = nsteps
-        super().__init__(history_len, discount, refresh_func)
-
-    def _calculate_returns(self, rewards, qvalues, mask, discount):
-        return calculate_nstep_returns(rewards, qvalues, discount, self.nsteps)
+    raise ValueError('Unrecognized return type {}'.format(return_type))
 
 
 class ReplayMemory:
-    def __init__(self, size, history_len, discount):
-        self.size = size
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority):
+        assert (cache_size % chunk_size) == 0
+        # Extra samples to fit exactly `capacity` (overlapping) chunks
+        self.capacity = capacity + (history_len - 1) + chunk_size
         self.history_len = history_len
         self.discount = discount
+        self.num_samples = 0
 
+        self.cache_size = cache_size
+        self.chunk_size = chunk_size
+        self.priority = priority
         self.refresh_func = None
 
-        self.episodes = []
-        self.waiting_episodes = []
-        self.current_episode = None
+        # Main variables for memory
+        self.obs = None  # Allocated dynamically once shape/dtype are known
+        self.actions = np.empty([self.capacity], dtype=np.int32)
+        self.rewards = np.empty([self.capacity], dtype=np.float32)
+        self.dones = np.empty([self.capacity], dtype=np.bool)
+        self.next = 0  # Points to next transition to be overwritten
+
+        # Auxiliary buffers for the cache -- pre-allocated to smooth memory usage
+        self.cached_obs = None  # Allocated dynamically once shape/dtype are known
+        self.cached_actions = np.empty([self.cache_size], dtype=np.int32)
+        self.cached_returns = np.empty([self.cache_size], dtype=np.float32)
+        self.cached_errors  = np.empty([self.cache_size], dtype=np.float32)
+        self.cached_indices = np.empty([self.cache_size], dtype=np.int32)
 
     def register_refresh_func(self, f):
+        assert self.refresh_func is None
         self.refresh_func = f
 
-    def can_sample(self):
-        return len(self.episodes) > 0
-
-    def _encode_sample(self, idxes):
-        samples = [self.episodes[i].sample() for i in idxes]
-        obs_batch, act_batch, rew_batch = zip(*samples)
-
-        return np.array(obs_batch), np.array(act_batch), np.array(rew_batch)
-
     def sample(self, batch_size):
-        assert self.can_sample()
+        start = self.batch_counter * batch_size
+        end = start + batch_size
+        indices = self.cached_indices[start:end]
 
-        lengths = np.array([e.length for e in self.episodes])
-        bias_correction = lengths / np.sum(lengths)
+        obs_batch = self.cached_obs[indices]
+        act_batch = self.cached_actions[indices]
+        ret_batch = self.cached_returns[indices]
 
-        idxes = np.random.choice(
-            a=np.arange(len(self.episodes)),
-            size=batch_size,
-            p=bias_correction,
-        )
-        return self._encode_sample(idxes)
+        self.batch_counter += 1
+
+        return np.array(obs_batch), np.array(act_batch), np.array(ret_batch)
 
     def encode_recent_observation(self):
-        if self.current_episode.length > 0:
-            return self.current_episode._encode_observation(-1)
-        else:
-            return self.waiting_episodes[-1]._encode_observation(-1)
+        i = self.len()
+        return self._encode_observation(i)
 
-    def store_frame(self, frame):
-        if self.current_episode is None:
-            self.current_episode = self._new_episode()
-        self.current_episode.store_frame(frame)
+    def _encode_observation(self, i):
+        i = self._align(i)
+
+        # Start with blank observations except the last
+        obs = np.zeros([self.history_len, *self.obs[0].shape], dtype=self.obs[0].dtype)
+        obs[-1] = self.obs[i]
+
+        # Fill-in backwards, break if we reach a terminal state
+        for j in range(1, min(self.history_len, self.len())):
+            if self.dones[i-j]:
+                break
+            obs[-1-j] = self.obs[i-j]
+
+        return obs
+
+    def _align(self, i):
+        # Make relative to pointer when full
+        if not self.full(): return i
+        return (i + self.next) % self.capacity
+
+    def store_obs(self, obs):
+        if self.obs is None:
+            self.obs = np.empty([self.capacity, *obs.shape], dtype=obs.dtype)
+        if self.cached_obs is None:
+            self.cached_obs = np.empty([self.cache_size, self.history_len, *obs.shape], dtype=obs.dtype)
+        self.obs[self.next] = obs
 
     def store_effect(self, action, reward, done):
-        self.current_episode.store_effect(action, reward)
+        self.actions[self.next] = action
+        self.rewards[self.next] = reward
+        self.dones[self.next] = done
 
-        if done:
-            self._move_episode_to_buffer()
+        self.next = (self.next + 1) % self.capacity
+        self.num_samples = min(self.capacity, self.num_samples + 1)
 
-    def _move_episode_to_buffer(self):
-        self.current_episode.finish()
-        self.waiting_episodes.append(self.current_episode)
-        self.current_episode = self._new_episode()
+    def len(self):
+        return self.num_samples
 
-    def refresh(self):
-        self.episodes.extend(self.waiting_episodes)
-        self.waiting_episodes.clear()
-        while sum([e.length for e in self.episodes]) > self.size:
-            self.episodes.pop(0)
-        for e in self.episodes:
-            e.refresh()
+    def full(self):
+        return self.len() == self.capacity
 
-    def _new_episode(self):
+    def refresh(self, train_frac):
+        # Reset batch counter
+        self.batch_counter = 0
+
+        # Sample chunks until we have enough data
+        num_chunks = self.cache_size // self.chunk_size
+        chunk_ids = self._sample_chunk_ids(num_chunks)
+
+        self._refresh(train_frac, chunk_ids)  # Separate function for unit testing
+
+    def _refresh(self, train_frac, chunk_ids):
+        # Refresh the chunks we sampled and load them into the cache
+        for k, i in enumerate(chunk_ids):
+            obs = self._extract_chunk(None, i, obs=True)
+            actions = self._extract_chunk(self.actions, i)
+            rewards = self._extract_chunk(self.rewards, i)
+            dones = self._extract_chunk(self.dones, i)
+
+            max_qvalues, mask, onpolicy_qvalues = self.refresh_func(obs, actions)
+            returns = self._calculate_returns(rewards, max_qvalues, dones, mask)
+            errors = np.abs(returns - onpolicy_qvalues)
+
+            start = self.chunk_size * k
+            end = start + self.chunk_size
+
+            self.cached_obs[start:end] = obs[:-1]
+            self.cached_actions[start:end] = actions
+            self.cached_returns[start:end] = returns
+            self.cached_errors[start:end] = errors
+
+        # Prioritize samples
+        distr = self._prioritized_distribution(self.cached_errors, train_frac)
+        self.cached_indices = np.random.choice(self.cache_size, size=self.cache_size, replace=True, p=distr)
+
+    def _sample_chunk_ids(self, n):
+        return np.random.randint(self.history_len - 1, self.len() - self.chunk_size, size=n)
+
+    def _extract_chunk(self, a, start, obs=False):
+        end = start + self.chunk_size
+        if obs:
+            assert a is None
+            return np.array([self._encode_observation(i) for i in range(start, end + 1)])
+        return a[self._align(np.arange(start, end))]
+
+    def _prioritized_distribution(self, errors, train_frac):
+        # Start with the uniform distribution.
+        distr = np.ones_like(errors) / self.cache_size
+        # Adjust the probabilities based on whether their corresponding errors lie above/below the median.
+        p = self.priority_now(train_frac)
+        med = np.median(errors)
+        distr[errors > med] *= (1.0 + p)
+        distr[errors < med] *= (1.0 - p)
+        # Note that if the error was identically equal to the median, its probability was not adjusted;
+        # this is the correct behavior to guarantee the probabilities sum to 1.
+        # However, due to floating point errors, we still need to re-normalize the distribution here:
+        return distr / distr.sum()
+
+    def priority_now(self, train_frac):
+        return self.priority * (1.0 - train_frac)
+
+    def _calculate_returns(self, rewards, qvalues, dones, mask):
         raise NotImplementedError
 
 
 class LambdaReplayMemory(ReplayMemory):
-    def __init__(self, size, history_len, discount, Lambda, renormalize, use_watkins):
-        self.Lambda = Lambda
-        self.renormalize = renormalize
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins):
+        self.lambd = lambd
         self.use_watkins = use_watkins
-        super().__init__(size, history_len, discount)
+        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority)
 
-    def _new_episode(self):
-        return LambdaEpisode(self.history_len, self.discount, self.Lambda, self.renormalize, self.use_watkins, self.refresh_func)
+    def _calculate_returns(self, rewards, qvalues, dones, mask):
+        if not self.use_watkins:
+            mask = np.ones_like(qvalues)
+        return calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, self.lambd)
+
+
+class MedianLambdaReplayMemory(LambdaReplayMemory):
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, use_watkins):
+        lambd = None
+        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins)
+
+    def _calculate_returns(self, rewards, qvalues, dones, mask, k=21):
+        if not self.use_watkins:
+            mask = np.ones_like(qvalues)
+        assert k > 1
+        returns = np.empty(shape=[k, rewards.size], dtype=np.float32)
+        for i in range(0, k):
+            returns[i] = calculate_lambda_returns(rewards, qvalues, dones, mask, self.discount, lambd=i/(k-1))
+        return np.median(returns, axis=0)
+
+
+class MeanSquaredTDLambdaReplayMemory(LambdaReplayMemory):
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, max_td, use_watkins):
+        lambd = None
+        self.max_td = max_td
+        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins)
+
+    def _calculate_returns(self, rewards, qvalues, dones, mask, k=7):
+        f = super()._calculate_returns  # Use parent function to compute returns
+
+        # Try the extremes first
+        returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd=1.0)
+        if ok:
+            return returns
+
+        returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd=0.0)
+        if not ok:
+            return returns
+
+        # If we haven't returned by now, we need to search for a good lambda value
+        best_returns = None
+        lambd = 0.5
+
+        for i in range(2, 2 + k):
+            returns, ok = self._try_lambda(f, rewards, qvalues, dones, mask, lambd)
+
+            if ok:
+                best_returns = returns
+                lambd += 1.0 / (2.0 ** i)
+            else:
+                lambd -= 1.0 / (2.0 ** i)
+
+        return best_returns if best_returns is not None else returns
+
+    def _try_lambda(self, f, rewards, qvalues, dones, mask, lambd):
+        self.lambd = lambd  # Pass implicitly to parent function
+        returns = f(rewards, qvalues, dones, mask)
+        td_error = np.square(returns - qvalues[:-1]).mean()
+        ok = (td_error <= self.max_td)
+        return returns, ok
 
 
 class NStepReplayMemory(ReplayMemory):
-    def __init__(self, size, history_len, discount, nsteps):
-        self.nsteps = nsteps
-        super().__init__(size, history_len, discount)
+    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, n):
+        self.n = n
+        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority)
 
-    def _new_episode(self):
-        return NStepEpisode(self.history_len, self.discount, self.nsteps, self.refresh_func)
+    def _calculate_returns(self, rewards, qvalues, dones, mask):
+        return calculate_nstep_returns(rewards, qvalues, dones, self.discount, self.n)

@@ -1,54 +1,55 @@
 ---
-exp1:
-  n_seeds: 3
-  env:
-    - beam_rider
-    - breakout
-    - pong
-    - qbert
-    - seaquest
-    - space_invaders
-  history_len: [1]
-  recurrent: false
+dqn-baseline:
+  legacy: true
+  num_seeds: 10
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [1, 4]
+  return_type: [nstep-3]
+
+ablation-cache-size:
+  num_seeds: 10
+  timesteps: 10000000
+  env: [seaquest, space_invaders]
+  history_len: [4]
+  return_type: [nstep-3]
+  cache_size: [80000, 160000, 240000]
+  priority: [0.0]
+
+lambda-sweep:
+  num_seeds: 10
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [4]
   return_type:
-    - nstep-5
     - pengs-0.25
     - pengs-0.5
     - pengs-0.75
-
-exp2a:
-  n_seeds: 3
-  env:
-    - breakout
-    - space_invaders
-  history_len: [1]
-  recurrent: false
-  return_type:
-    - renorm-pengs-0.25
+    - pengs-1.0
     - watkins-0.25
-    - renorm-watkins-0.25
-
-exp2b:
-  n_seeds: 3
-  env:
-    - beam_rider
-    - seaquest
-  history_len: [1]
-  recurrent: false
-  return_type:
-    - renorm-pengs-0.5
     - watkins-0.5
-    - renorm-watkins-0.5
-
-exp2c:
-  n_seeds: 3
-  env:
-    - pong
-    - qbert
-  history_len: [1]
-  recurrent: false
-  return_type:
-    - renorm-pengs-0.75
     - watkins-0.75
-    - renorm-watkins-0.75
+    - watkins-1.0
+  cache_size: [80000]
+  priority: [0.0]
+
+showcase:
+  num_seeds: 10
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [4]
+  return_type:
+    - pengs-median
+    - pengs-maxtd-0.025
+  cache_size: [80000]
+  priority: [0.1]
+
+partial-observability:
+  num_seeds: 10
+  timesteps: 10000000
+  env: [beam_rider, breakout, pong, qbert, seaquest, space_invaders]
+  history_len: [1]
+  return_type: [pengs-median]
+  cache_size: [80000]
+  priority: [0.1]
 ...

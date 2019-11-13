@@ -15,7 +15,7 @@ def benchmark(env, policy, epsilon, n_episodes):
             action, rnn_state = policy(state, rnn_state, epsilon)
             state, _, done, _ = env.step(action)
 
-    return get_episode_rewards(env)[-n_episodes:]
+    return list(get_episode_rewards(env)[-n_episodes:])
 
 
 def get_episode_rewards(env):
@@ -46,6 +46,24 @@ def make_session(seed):
     tf.set_random_seed(seed)  # Must be called after graph creation or results will be non-deterministic
 
     return session
+
+
+def minimize_with_grad_clipping(optimizer, loss, var_list, clip):
+    grads_and_vars = optimizer.compute_gradients(loss, var_list)
+    if clip is not None:
+        grads_and_vars = [(tf.clip_by_value(g, -clip, +clip), v) for g, v in grads_and_vars]
+    train_op = optimizer.apply_gradients(grads_and_vars)
+    return train_op
+
+
+def create_copy_op(src_scope, dst_scope):
+    src_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=src_scope)
+    dst_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=dst_scope)
+    assert len(src_vars) == len(dst_vars)
+
+    src_vars = sorted(src_vars, key=lambda v: v.name)
+    dst_vars = sorted(dst_vars, key=lambda v: v.name)
+    return tf.group(*[dst.assign(src) for src, dst in zip(src_vars, dst_vars)])
 
 
 def huber_loss(x, delta=1.0):
