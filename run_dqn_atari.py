@@ -28,7 +28,6 @@ def get_args():
     parser.add_argument('--chunk-size',  type=int, default=100)
     parser.add_argument('--priority',    type=float, default=0.0)
     parser.add_argument('--seed',        type=int, default=0)
-    parser.add_argument('--recurrent',   action='store_true')
     parser.add_argument('--legacy',      action='store_true')
     return parser.parse_args()
 
@@ -63,7 +62,7 @@ def main():
             session,
             env,
             benchmark_env,
-            AtariRecurrentConvNet if args.recurrent else AtariConvNet,
+            atari_cnn,
             replay_memory,
             optimizer=optimizer,
             exploration=exploration_schedule,

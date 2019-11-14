@@ -1,89 +1,29 @@
 import tensorflow as tf
 from tensorflow.python.layers.layers import *
-from tensorflow.contrib.rnn import LSTMBlockFusedCell
 
 
-class QFunction:
-    def __init__(self, state, n_actions, scope):
-        raise NotImplementedError
-
-    def is_recurrent(self):
-        raise NotImplementedError
-
-
-class CartPoleNet(QFunction):
-    def __init__(self, state, n_actions, scope):
-        hidden = flatten(state) # flatten to make sure 2-D
-
-        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)
-            hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)
-            qvalues = dense(hidden, units=n_actions, activation=None)
-
-        self.qvalues = qvalues
-
-    def is_recurrent(self):
-        return False
+def cartpole_mlp(state, n_actions, scope):
+    hidden = flatten(state) # flatten to make sure 2-D
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+        hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)
+        hidden  = dense(hidden, units=512,       activation=tf.nn.tanh)
+        qvalues = dense(hidden, units=n_actions, activation=None)
+    return qvalues
 
 
-class AtariRecurrentConvNet(QFunction):
-    def __init__(self, state, n_actions, scope):
-        state = tf.cast(state, tf.float32) / 255.0
+def atari_cnn(state, n_actions, scope):
+    hidden = tf.cast(state, tf.float32) / 255.0
+    hidden = tf.unstack(hidden, axis=1)
+    hidden = tf.concat(hidden, axis=-1)
 
-        hidden = tf.reshape(state, [-1, state.shape[2], state.shape[3], state.shape[4]])
-        print('Recurrent', state.shape)
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+        hidden = conv2d(hidden, filters=32, kernel_size=8, strides=4, activation=tf.nn.relu)
+        hidden = conv2d(hidden, filters=64, kernel_size=4, strides=2, activation=tf.nn.relu)
+        hidden = conv2d(hidden, filters=64, kernel_size=3, strides=1, activation=tf.nn.relu)
 
-        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            hidden = conv2d(hidden, filters=32, kernel_size=8, strides=4, activation=tf.nn.relu)
-            hidden = conv2d(hidden, filters=64, kernel_size=4, strides=2, activation=tf.nn.relu)
-            hidden = conv2d(hidden, filters=64, kernel_size=3, strides=1, activation=tf.nn.relu)
+        hidden = flatten(hidden)
 
-            batch_size = tf.shape(state)[0]
-            hidden = tf.reshape(hidden, [batch_size, state.shape[1], tf.size(hidden[0])])
+        hidden  = dense(hidden, units=512,       activation=tf.nn.relu)
+        qvalues = dense(hidden, units=n_actions, activation=None)
 
-            hidden, new_rnn_state = self.lstm(hidden, batch_size, num_units=512)
-            qvalues = dense(hidden[:, -1], units=n_actions, activation=None)
-
-        self.qvalues = qvalues
-
-    def lstm(self, inputs, batch_size, num_units, swap_axes=True):
-        if swap_axes:
-            inputs = tf.transpose(inputs, [1, 0, 2])
-        cell = LSTMBlockFusedCell(num_units)
-        self.rnn_state = self.zero_state(batch_size, num_units)
-        outputs, new_rnn_state = cell(inputs=inputs, initial_state=self.rnn_state, dtype=tf.float32)
-        if swap_axes:
-            outputs = tf.transpose(outputs, [1, 0, 2])
-        return outputs, new_rnn_state
-
-    def zero_state(self, batch_size, num_units):
-        shape = (batch_size, num_units)
-        return (tf.zeros(shape), tf.zeros(shape))
-
-    def is_recurrent(self):
-        return True
-
-
-class AtariConvNet(QFunction):
-    def __init__(self, state, n_actions, scope):
-        state = tf.cast(state, tf.float32) / 255.0
-
-        hidden = state
-        hidden = tf.unstack(hidden, axis=1)
-        hidden = tf.concat(hidden, axis=-1)
-        print('Feedforward', hidden.shape)
-
-        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            hidden = conv2d(hidden, filters=32, kernel_size=8, strides=4, activation=tf.nn.relu)
-            hidden = conv2d(hidden, filters=64, kernel_size=4, strides=2, activation=tf.nn.relu)
-            hidden = conv2d(hidden, filters=64, kernel_size=3, strides=1, activation=tf.nn.relu)
-
-            hidden = flatten(hidden)
-
-            hidden  = dense(hidden, units=512,       activation=tf.nn.relu)
-            qvalues = dense(hidden, units=n_actions, activation=None)
-
-        self.qvalues = qvalues
-
-    def is_recurrent(self):
-        return False
+    return qvalues

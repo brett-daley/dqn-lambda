@@ -12,10 +12,10 @@ from replay_memory_legacy import LegacyReplayMemory
 def learn(session,
           env,
           benchmark_env,
-          QFunction,
+          q_function,
           replay_memory,
           optimizer,
-          exploration=LinearSchedule(1000000, 0.1),
+          exploration,
           max_timesteps=50000000,
           batch_size=32,
           learning_starts=50000,
@@ -42,9 +42,7 @@ def learn(session,
     act_t_ph  = tf.placeholder(tf.int32,   [None])
     return_ph = tf.placeholder(tf.float32, [None])
 
-    q_func = QFunction(obs_t_ph, n_actions, scope='main')
-    qvalues = q_func.qvalues
-    rnn_state_tf = q_func.rnn_state if q_func.is_recurrent() else None
+    qvalues = q_function(obs_t_ph, n_actions, scope='main')
 
     greedy_actions = tf.argmax(qvalues, axis=1)
     greedy_qvalues = tf.reduce_max(qvalues, axis=1)
@@ -65,7 +63,7 @@ def learn(session,
             mask = (actions == greedy_acts[:-1])
             return greedy_qvals, mask, onpolicy_qvals
     else:
-        max_target_qvalues = tf.reduce_max(QFunction(obs_t_ph, n_actions, scope='target').qvalues, axis=1)
+        max_target_qvalues = tf.reduce_max(q_function(obs_t_ph, n_actions, scope='target'), axis=1)
         target_update_op = create_copy_op(src_scope='main', dst_scope='target')
 
         def refresh(states):
@@ -79,26 +77,12 @@ def learn(session,
     # initialize variables
     session.run(tf.global_variables_initializer())
 
-    def epsilon_greedy(obs, rnn_state, epsilon):
+    def epsilon_greedy(obs, epsilon):
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
             action = session.run(greedy_actions, feed_dict={obs_t_ph: obs[None]})[0]
-        return action, None
-
-    def epsilon_greedy_rnn(obs, rnn_state, epsilon):
-        feed_dict = {obs_t_ph: obs[None]}
-        if rnn_state is not None:
-            feed_dict[q_func.rnn_state] = rnn_state
-
-        if np.random.rand() < epsilon:
-            action = env.action_space.sample()
-            rnn_state = session.run(rnn_state_tf, feed_dict)
-        else:
-            action, rnn_state = session.run([greedy_actions, rnn_state_tf], feed_dict)
-            action = action[0]
-
-        return action, rnn_state
+        return action
 
     def train():
         obs_batch, act_batch, ret_batch = replay_memory.sample(batch_size)
@@ -111,11 +95,9 @@ def learn(session,
 
     best_mean_reward = -float('inf')
     obs = env.reset()
-    rnn_state = None
     n_epochs = 0
 
-    policy = epsilon_greedy_rnn if q_func.is_recurrent() else epsilon_greedy
-    benchmark_rewards = benchmark(benchmark_env, policy, epsilon=1.0, n_episodes=mov_avg_size)
+    benchmark_rewards = benchmark(benchmark_env, policy=epsilon_greedy, epsilon=1.0, n_episodes=mov_avg_size)
     start_time = time.time()
 
     for t in itertools.count():
@@ -148,14 +130,13 @@ def learn(session,
         replay_memory.store_obs(obs)
         obs = replay_memory.encode_recent_observation()
 
-        action, rnn_state = policy(obs, rnn_state, epsilon=exploration.value(t))
+        action = epsilon_greedy(obs, epsilon=exploration.value(t))
         obs, reward, done, _ = env.step(action)
 
         replay_memory.store_effect(action, reward, done)
 
         if done:
             obs = env.reset()
-            rnn_state = None
 
         if t >= learning_starts:
             if not legacy_mode:

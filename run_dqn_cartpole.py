@@ -38,7 +38,7 @@ def main():
             session,
             env,
             benchmark_env,
-            CartPoleNet,
+            cartpole_mlp,
             replay_memory,
             optimizer=optimizer,
             exploration=exploration_schedule,
