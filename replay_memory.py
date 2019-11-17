@@ -4,8 +4,8 @@ import re
 from return_calculation import calculate_lambda_returns, calculate_nstep_returns
 
 
-def make_replay_memory(return_type, capacity, history_len, discount, cache_size, chunk_size, priority):
-    shared_args = (capacity, history_len, discount, cache_size, chunk_size, priority)
+def make_replay_memory(return_type, capacity, history_len, discount, cache_size, block_size, priority):
+    shared_args = (capacity, history_len, discount, cache_size, block_size, priority)
     int_capture = r'([0-9]+)'
     float_capture = r'([0-9]+\.[0-9]+)'
 
@@ -44,16 +44,16 @@ def make_replay_memory(return_type, capacity, history_len, discount, cache_size,
 
 
 class ReplayMemory:
-    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority):
-        assert (cache_size % chunk_size) == 0
-        # Extra samples to fit exactly `capacity` (overlapping) chunks
-        self.capacity = capacity + (history_len - 1) + chunk_size
+    def __init__(self, capacity, history_len, discount, cache_size, block_size, priority):
+        assert (cache_size % block_size) == 0
+        # Extra samples to fit exactly `capacity` (overlapping) blocks
+        self.capacity = capacity + (history_len - 1) + block_size
         self.history_len = history_len
         self.discount = discount
         self.num_samples = 0
 
         self.cache_size = cache_size
-        self.chunk_size = chunk_size
+        self.block_size = block_size
         self.priority = priority
         self.refresh_func = None
 
@@ -137,26 +137,26 @@ class ReplayMemory:
         # Reset batch counter
         self.batch_counter = 0
 
-        # Sample chunks until we have enough data
-        num_chunks = self.cache_size // self.chunk_size
-        chunk_ids = self._sample_chunk_ids(num_chunks)
+        # Sample blocks until we have enough data
+        num_blocks = self.cache_size // self.block_size
+        block_ids = self._sample_block_ids(num_blocks)
 
-        self._refresh(train_frac, chunk_ids)  # Separate function for unit testing
+        self._refresh(train_frac, block_ids)  # Separate function for unit testing
 
-    def _refresh(self, train_frac, chunk_ids):
-        # Refresh the chunks we sampled and load them into the cache
-        for k, i in enumerate(chunk_ids):
-            obs = self._extract_chunk(None, i, obs=True)
-            actions = self._extract_chunk(self.actions, i)
-            rewards = self._extract_chunk(self.rewards, i)
-            dones = self._extract_chunk(self.dones, i)
+    def _refresh(self, train_frac, block_ids):
+        # Refresh the blocks we sampled and load them into the cache
+        for k, i in enumerate(block_ids):
+            obs = self._extract_block(None, i, obs=True)
+            actions = self._extract_block(self.actions, i)
+            rewards = self._extract_block(self.rewards, i)
+            dones = self._extract_block(self.dones, i)
 
             max_qvalues, mask, onpolicy_qvalues = self.refresh_func(obs, actions)
             returns = self._calculate_returns(rewards, max_qvalues, dones, mask)
             errors = np.abs(returns - onpolicy_qvalues)
 
-            start = self.chunk_size * k
-            end = start + self.chunk_size
+            start = self.block_size * k
+            end = start + self.block_size
 
             self.cached_obs[start:end] = obs[:-1]
             self.cached_actions[start:end] = actions
@@ -167,11 +167,11 @@ class ReplayMemory:
         distr = self._prioritized_distribution(self.cached_errors, train_frac)
         self.cached_indices = np.random.choice(self.cache_size, size=self.cache_size, replace=True, p=distr)
 
-    def _sample_chunk_ids(self, n):
-        return np.random.randint(self.history_len - 1, self.len() - self.chunk_size, size=n)
+    def _sample_block_ids(self, n):
+        return np.random.randint(self.history_len - 1, self.len() - self.block_size, size=n)
 
-    def _extract_chunk(self, a, start, obs=False):
-        end = start + self.chunk_size
+    def _extract_block(self, a, start, obs=False):
+        end = start + self.block_size
         if obs:
             assert a is None
             return np.array([self._encode_observation(i) for i in range(start, end + 1)])
@@ -198,10 +198,10 @@ class ReplayMemory:
 
 
 class LambdaReplayMemory(ReplayMemory):
-    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins):
+    def __init__(self, capacity, history_len, discount, cache_size, block_size, priority, lambd, use_watkins):
         self.lambd = lambd
         self.use_watkins = use_watkins
-        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority)
+        super().__init__(capacity, history_len, discount, cache_size, block_size, priority)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
         if not self.use_watkins:
@@ -210,9 +210,9 @@ class LambdaReplayMemory(ReplayMemory):
 
 
 class MedianLambdaReplayMemory(LambdaReplayMemory):
-    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, use_watkins):
+    def __init__(self, capacity, history_len, discount, cache_size, block_size, priority, use_watkins):
         lambd = None
-        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins)
+        super().__init__(capacity, history_len, discount, cache_size, block_size, priority, lambd, use_watkins)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask, k=21):
         if not self.use_watkins:
@@ -225,10 +225,10 @@ class MedianLambdaReplayMemory(LambdaReplayMemory):
 
 
 class MeanSquaredTDLambdaReplayMemory(LambdaReplayMemory):
-    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, max_td, use_watkins):
+    def __init__(self, capacity, history_len, discount, cache_size, block_size, priority, max_td, use_watkins):
         lambd = None
         self.max_td = max_td
-        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority, lambd, use_watkins)
+        super().__init__(capacity, history_len, discount, cache_size, block_size, priority, lambd, use_watkins)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask, k=7):
         f = super()._calculate_returns  # Use parent function to compute returns
@@ -266,9 +266,9 @@ class MeanSquaredTDLambdaReplayMemory(LambdaReplayMemory):
 
 
 class NStepReplayMemory(ReplayMemory):
-    def __init__(self, capacity, history_len, discount, cache_size, chunk_size, priority, n):
+    def __init__(self, capacity, history_len, discount, cache_size, block_size, priority, n):
         self.n = n
-        super().__init__(capacity, history_len, discount, cache_size, chunk_size, priority)
+        super().__init__(capacity, history_len, discount, cache_size, block_size, priority)
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
         return calculate_nstep_returns(rewards, qvalues, dones, self.discount, self.n)

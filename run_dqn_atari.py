@@ -25,7 +25,7 @@ def get_args():
     parser.add_argument('--return-type', type=str, default='nstep-1')
     parser.add_argument('--history-len', type=int, default=4)
     parser.add_argument('--cache-size',  type=int, default=80000)
-    parser.add_argument('--chunk-size',  type=int, default=100)
+    parser.add_argument('--block-size',  type=int, default=100)
     parser.add_argument('--priority',    type=float, default=0.0)
     parser.add_argument('--seed',        type=int, default=0)
     parser.add_argument('--legacy',      action='store_true')
@@ -50,11 +50,11 @@ def main():
 
     if not args.legacy:
         replay_memory = make_replay_memory(args.return_type, replay_mem_size, args.history_len, discount,
-                                           args.cache_size, args.chunk_size, args.priority)
+                                           args.cache_size, args.block_size, args.priority)
     else:
         assert args.cache_size == 80000      # Ensure cache-related args have not been set
         assert args.priority == 0.0
-        assert args.chunk_size == 100
+        assert args.block_size == 100
         replay_memory = make_legacy_replay_memory(args.return_type, replay_mem_size, args.history_len, discount)
 
     with utils.make_session(args.seed) as session:

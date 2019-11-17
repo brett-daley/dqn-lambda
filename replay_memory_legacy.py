@@ -14,20 +14,20 @@ def make_legacy_replay_memory(return_type, capacity, history_len, discount):
 
 class LegacyReplayMemory(NStepReplayMemory):
     def __init__(self, capacity, history_len, discount, n):
-        super().__init__(capacity, history_len, discount, cache_size=0, chunk_size=n, priority=0.0, n=n)
+        super().__init__(capacity, history_len, discount, cache_size=0, block_size=n, priority=0.0, n=n)
 
     def sample(self, batch_size):
-        indices = self._sample_chunk_ids(batch_size)
+        indices = self._sample_block_ids(batch_size)
         return self._sample(indices)  # Separate function for unit testing
 
     def _sample(self, indices):
         obs_batch, act_batch, rew_batch, done_batch = [], [], [], []
 
         for i in indices:
-            obs_batch.append( self._extract_chunk(None, i, obs=True) )
-            act_batch.append( self._extract_chunk(self.actions, i) )
-            rew_batch.append( self._extract_chunk(self.rewards, i) )
-            done_batch.append( self._extract_chunk(self.dones, i).astype(np.float32) )
+            obs_batch.append( self._extract_block(None, i, obs=True) )
+            act_batch.append( self._extract_block(self.actions, i) )
+            rew_batch.append( self._extract_block(self.rewards, i) )
+            done_batch.append( self._extract_block(self.dones, i).astype(np.float32) )
 
         obs_batch, act_batch, rew_batch, done_batch = map(np.array, [obs_batch, act_batch, rew_batch, done_batch])
 
@@ -41,7 +41,7 @@ class LegacyReplayMemory(NStepReplayMemory):
     def refresh(self, cache_size, train_frac):
         raise NotImplementedError
 
-    def _refresh(self, cache_size, train_frac, chunk_ids):
+    def _refresh(self, cache_size, train_frac, block_ids):
         raise NotImplementedError
 
     def _calculate_returns(self, rewards, qvalues, dones, mask):
