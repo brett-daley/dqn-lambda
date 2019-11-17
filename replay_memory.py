@@ -52,7 +52,7 @@ class ReplayMemory:
         self.discount = discount
         self.num_samples = 0
 
-        self.cache_size = cache_size
+        self.cache_size = int(cache_size)
         self.block_size = block_size
         self.priority = priority
         self.refresh_func = None

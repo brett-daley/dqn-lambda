@@ -19,16 +19,26 @@ def make_atari_env(name, seed):
 
 
 def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--env',         type=str, default='pong')
-    parser.add_argument('--timesteps',   type=int, default=10000000)
-    parser.add_argument('--return-type', type=str, default='nstep-1')
-    parser.add_argument('--history-len', type=int, default=4)
-    parser.add_argument('--cache-size',  type=int, default=80000)
-    parser.add_argument('--block-size',  type=int, default=100)
-    parser.add_argument('--priority',    type=float, default=0.0)
-    parser.add_argument('--seed',        type=int, default=0)
-    parser.add_argument('--legacy',      action='store_true')
+    parser = argparse.ArgumentParser(description='Trains DQN(lambda) on an Atari game. (https://arxiv.org/abs/1810.09967)')
+    parser.add_argument('--env', type=str, default='pong',
+                        help="(str) Name of Atari game to play. See README. Default: 'pong'")
+    parser.add_argument('--timesteps', type=float, default=10e6,
+                        help='(float) Training duration in timesteps. Default: 10e6')
+    parser.add_argument('--return-type', type=str, default='nstep-1',
+                        help="(str) Estimator used to compute returns. See README. Default: 'nstep-1'")
+    parser.add_argument('--history-len', type=int, default=4,
+                        help='(int) Number of recent observations fed to Q-network. Default: 4')
+    parser.add_argument('--cache-size', type=float, default=80e3,
+                        help='(float) Number of samples in the cache. Cannot use with --legacy. Default: 80e3')
+    parser.add_argument('--block-size', type=int, default=100,
+                        help='(int) Refresh the cache using sequences of this length. Cannot use with --legacy. Default: 100')
+    parser.add_argument('--priority', type=float, default=0.0,
+                        help='(float) Extent to which cache samples are prioritized by TD error. Must be in [0.0, 1.0]. '
+                        'High value may degrade performance. Cannot use with --legacy. Default: 0.0')
+    parser.add_argument('--seed', type=int, default=0,
+                        help='(int) Seed for random number generation. Default: 0')
+    parser.add_argument('--legacy', action='store_true',
+                        help='If present, train DQN with target network instead of DQN(lambda) with cache.')
     return parser.parse_args()
 
 
