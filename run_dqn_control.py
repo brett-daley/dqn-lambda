@@ -8,7 +8,7 @@ from q_functions import *
 from replay_memory import make_replay_memory
 
 
-def make_continuouscontrol_env(name, seed):
+def make_gym_env(name, seed):
     env = gym.make(name)
     env = monitor(env, name)
     env.seed(seed)
@@ -18,8 +18,8 @@ def make_continuouscontrol_env(name, seed):
 def main():
     seed = 0
     name = 'CartPole-v0'
-    env = make_continuouscontrol_env(name, seed)
-    benchmark_env = make_continuouscontrol_env(name, seed+1)
+    env = make_gym_env(name, seed)
+    benchmark_env = make_gym_env(name, seed+1)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
 
