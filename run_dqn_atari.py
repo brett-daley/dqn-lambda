@@ -24,7 +24,7 @@ def get_args():
                         help="(str) Name of Atari game to play. See README. Default: 'pong'")
     parser.add_argument('--timesteps', type=float, default=10e6,
                         help='(float) Training duration in timesteps. Default: 10e6')
-    parser.add_argument('--return-type', type=str, default='nstep-1',
+    parser.add_argument('--return-est', type=str, default='nstep-1',
                         help="(str) Estimator used to compute returns. See README. Default: 'nstep-1'")
     parser.add_argument('--history-len', type=int, default=4,
                         help='(int) Number of recent observations fed to Q-network. Default: 4')
@@ -59,13 +59,13 @@ def main():
     replay_mem_size = 1000000
 
     if not args.legacy:
-        replay_memory = make_replay_memory(args.return_type, replay_mem_size, args.history_len, discount,
+        replay_memory = make_replay_memory(args.return_est, replay_mem_size, args.history_len, discount,
                                            args.cache_size, args.block_size, args.priority)
     else:
         assert args.cache_size == 80000      # Ensure cache-related args have not been set
         assert args.priority == 0.0
         assert args.block_size == 100
-        replay_memory = make_legacy_replay_memory(args.return_type, replay_mem_size, args.history_len, discount)
+        replay_memory = make_legacy_replay_memory(args.return_est, replay_mem_size, args.history_len, discount)
 
     with utils.make_session(args.seed) as session:
         dqn.learn(

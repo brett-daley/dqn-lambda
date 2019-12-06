@@ -4,43 +4,43 @@ import re
 from return_calculation import calculate_lambda_returns, calculate_nstep_returns
 
 
-def make_replay_memory(return_type, capacity, history_len, discount, cache_size, block_size, priority):
+def make_replay_memory(return_est, capacity, history_len, discount, cache_size, block_size, priority):
     shared_args = (capacity, history_len, discount, cache_size, block_size, priority)
     int_capture = r'([0-9]+)'
     float_capture = r'([0-9]+\.[0-9]+)'
 
-    match = re.match('nstep-' + int_capture, return_type)
+    match = re.match('nstep-' + int_capture, return_est)
     if match:
         n = int(match.group(1))
         return NStepReplayMemory(*shared_args, n)
 
-    match = re.match('pengs-' + float_capture, return_type)
+    match = re.match('pengs-' + float_capture, return_est)
     if match:
         lambd = float(match.group(1))
         return LambdaReplayMemory(*shared_args, lambd, use_watkins=False)
 
-    match = re.match('watkins-' + float_capture, return_type)
+    match = re.match('watkins-' + float_capture, return_est)
     if match:
         lambd = float(match.group(1))
         return LambdaReplayMemory(*shared_args, lambd, use_watkins=True)
 
-    if return_type == 'pengs-median':
+    if return_est == 'pengs-median':
         return MedianLambdaReplayMemory(*shared_args, use_watkins=False)
 
-    if return_type == 'watkins-median':
+    if return_est == 'watkins-median':
         return MedianLambdaReplayMemory(*shared_args, use_watkins=True)
 
-    match = re.match('pengs-maxtd-' + float_capture, return_type)
+    match = re.match('pengs-maxtd-' + float_capture, return_est)
     if match:
         max_td = float(match.group(1))
         return MeanSquaredTDLambdaReplayMemory(*shared_args, max_td, use_watkins=False)
 
-    match = re.match('watkins-maxtd-' + float_capture, return_type)
+    match = re.match('watkins-maxtd-' + float_capture, return_est)
     if match:
         max_td = float(match.group(1))
         return MeanSquaredTDLambdaReplayMemory(*shared_args, max_td, use_watkins=True)
 
-    raise ValueError('Unrecognized return type {}'.format(return_type))
+    raise ValueError('Unrecognized return estimator {}'.format(return_est))
 
 
 class ReplayMemory:

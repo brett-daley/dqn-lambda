@@ -26,7 +26,7 @@ If you use this repository in published work, please cite the paper:
 
 [Atari Environment Naming Convention](#atari-environment-naming-convention)
 
-[Return Types](#return-types)
+[Return Estimators](#return-estimators)
 
 [License, Acknowledgments, and References](#license)
 
@@ -57,10 +57,10 @@ You can train DQN(λ) on any of the Atari games included in the OpenAI Gym (see 
 For example, the following command runs DQN(λ) with λ=0.75 on Pong for 1.5 million timesteps:
 
 ```
-python run_dqn_atari.py --env pong --return-type pengs-0.75 --timesteps 1.5e6
+python run_dqn_atari.py --env pong --return-est pengs-0.75 --timesteps 1.5e6
 ```
 
-See [Return Types](#return-types) for all of the _n_-step returns and λ-returns supported by `--return-type`.
+See [Return Estimators](#return-estimators) for all of the _n_-step returns and λ-returns supported by `--return-est`.
 To get a description of the other possible command-line arguments, run this:
 
 ```
@@ -103,18 +103,18 @@ Traceback (most recent call last):
 AssertionError
 ```
 
-Similarly, trying to use `--legacy` with a [return type](#return-types) other than _n_-step returns will also throw an error:
+Similarly, trying to use `--legacy` with a [return estimator](#return-estimators) other than _n_-step returns will also throw an error:
 
 ```
-python run_dqn_atari.py --return-type pengs-0.75 --legacy
+python run_dqn_atari.py --return-est pengs-0.75 --legacy
 
 Traceback (most recent call last):
   File "run_dqn_atari.py", line 82, in <module>
     main()
   File "run_dqn_atari.py", line 59, in main
-    replay_memory = make_legacy_replay_memory(args.return_type, replay_mem_size, args.history_len, discount)
+    replay_memory = make_legacy_replay_memory(args.return_est, replay_mem_size, args.history_len, discount)
   File "/home/brett/dqn-lambda/replay_memory_legacy.py", line 10, in make_legacy_replay_memory
-    raise ValueError('Legacy mode only supports n-step returns but requested {}'.format(return_type))
+    raise ValueError('Legacy mode only supports n-step returns but requested {}'.format(return_est))
 ValueError: Legacy mode only supports n-step returns but requested pengs-0.75
 ```
 
@@ -142,13 +142,13 @@ This pattern applies to [all of the Atari games supported by OpenAI Gym](https:/
 
 ---
 
-## Return Types
+## Return Estimators
 
-The `--return-type` argument accepts a string that determines which return estimator should be used.
+The `--return-est` argument accepts a string that determines which return estimator should be used.
 The estimator might be parameterized by an `<int>` (greater than 0) or a `<float>` (between 0.0 and 1.0 (inclusive) — decimal point mandatory).
-The table below summarizes all of the possible return types supported by DQN(λ).
+The table below summarizes all of the possible return estimators supported by DQN(λ).
 
-Return Type | Format | Example | Description
+Return Estimator | Format | Example | Description
 --- | --- | --- | ---
 _n_-step | `nstep-<int>` | `nstep-3` | Classic _n_-step return [[3](#references)].<br>Standard DQN uses _n_=1.<br>_n_=`<int>`
 Peng's Q(λ) | `pengs-<float>` | `pengs-0.75` | λ-return, unconditionally uses<br>max Q-values [[4](#references)].<br>A good "default" λ-return.<br>λ=`<float>`

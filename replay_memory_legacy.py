@@ -4,10 +4,10 @@ import re
 from replay_memory import NStepReplayMemory
 
 
-def make_legacy_replay_memory(return_type, capacity, history_len, discount):
-    match = re.match('nstep-([0-9]+)', return_type)
+def make_legacy_replay_memory(return_est, capacity, history_len, discount):
+    match = re.match('nstep-([0-9]+)', return_est)
     if not match:
-        raise ValueError('Legacy mode only supports n-step returns but requested {}'.format(return_type))
+        raise ValueError('Legacy mode only supports n-step returns but requested {}'.format(return_est))
     n = int(match.group(1))
     return LegacyReplayMemory(capacity, history_len, discount, n)
 
