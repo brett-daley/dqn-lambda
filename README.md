@@ -10,6 +10,7 @@ If you use this repository in published work, please cite the paper:
   title={Reconciling $\lambda$-Returns with Experience Replay},
   author={Daley, Brett and Amato, Christopher},
   booktitle={Advances in Neural Information Processing Systems},
+  pages={1131--1140},
   year={2019}
 }
 ```
@@ -34,9 +35,8 @@ If you use this repository in published work, please cite the paper:
 
 ## Setup
 
-This repository requires Python 3.5+ along with these dependencies: `gym`, `atari-py`, `tensorflow`, and `numpy`.
-
-To automatically install package versions that are known to work with this code, just clone the repository and run `pip`:
+This repository requires Python 3.
+To automatically install working package versions, just clone the repository and run `pip`:
 
 ```
 git clone https://github.com/brett-daley/dqn-lambda.git
