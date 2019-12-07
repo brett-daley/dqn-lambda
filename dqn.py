@@ -9,25 +9,26 @@ from wrappers import HistoryWrapper
 from replay_memory_legacy import LegacyReplayMemory
 
 
-def learn(session,
-          env,
-          benchmark_env,
-          q_function,
-          replay_memory,
-          optimizer,
-          exploration,
-          max_timesteps=50000000,
-          batch_size=32,
-          learning_starts=50000,
-          learning_freq=4,
-          target_update_freq=10000,
-          grad_clip=None,
-          log_every_n_steps=100000,
-          mov_avg_size=100,
+def learn(
+        session,
+        env,
+        benchmark_env,
+        q_function,
+        replay_memory,
+        optimizer,
+        exploration,
+        max_timesteps,
+        batch_size,
+        prepopulate,
+        train_freq,
+        target_update_freq,
+        grad_clip=None,
+        log_every_n_steps=10000,
+        mov_avg_size=100,
     ):
 
-    assert (learning_starts % target_update_freq) == 0
-    assert (target_update_freq % learning_freq) == 0
+    assert (prepopulate % target_update_freq) == 0
+    assert (target_update_freq % train_freq) == 0
     assert type(env.observation_space) == gym.spaces.Box
     assert type(env.action_space)      == gym.spaces.Discrete
 
@@ -101,7 +102,8 @@ def learn(session,
     start_time = time.time()
 
     for t in itertools.count():
-        train_frac = max(0.0, (t - learning_starts) / (max_timesteps - learning_starts))
+        train_frac = max(0.0, (t - prepopulate) / (max_timesteps - prepopulate))
+        epsilon = exploration.value(t)
 
         if t % log_every_n_steps == 0:
             print('Epoch', n_epochs)
@@ -114,7 +116,7 @@ def learn(session,
             best_mean_reward = max(mean_reward, best_mean_reward)
 
             print('Episodes', len(get_episode_rewards(env)))
-            print('Exploration', exploration.value(t))
+            print('Exploration', epsilon)
             if not legacy_mode:
                 print('Priority', replay_memory.priority_now(train_frac))
             print('Mean reward', mean_reward)
@@ -130,7 +132,7 @@ def learn(session,
         replay_memory.store_obs(obs)
         obs = replay_memory.encode_recent_observation()
 
-        action = epsilon_greedy(obs, epsilon=exploration.value(t))
+        action = epsilon_greedy(obs, epsilon)
         obs, reward, done, _ = env.step(action)
 
         replay_memory.store_effect(action, reward, done)
@@ -138,7 +140,7 @@ def learn(session,
         if done:
             obs = env.reset()
 
-        if t >= learning_starts:
+        if t >= prepopulate:
             if not legacy_mode:
                 if t % target_update_freq == 0:
                     replay_memory.refresh(train_frac)
@@ -150,7 +152,7 @@ def learn(session,
                 if t % target_update_freq == 0:
                     session.run(target_update_op)
 
-                if t % learning_freq == 0:
+                if t % train_freq == 0:
                     train()
 
     all_rewards = benchmark_rewards + get_episode_rewards(env)
