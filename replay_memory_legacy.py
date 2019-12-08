@@ -21,22 +21,22 @@ class LegacyReplayMemory(NStepReplayMemory):
         return self._sample(indices)  # Separate function for unit testing
 
     def _sample(self, indices):
-        obs_batch, act_batch, rew_batch, done_batch = [], [], [], []
+        state_batch, action_batch, reward_batch, done_batch = [], [], [], []
 
         for i in indices:
-            obs_batch.append( self._extract_block(None, i, obs=True) )
-            act_batch.append( self._extract_block(self.actions, i) )
-            rew_batch.append( self._extract_block(self.rewards, i) )
+            state_batch.append( self._extract_block(None, i, states=True) )
+            action_batch.append( self._extract_block(self.actions, i) )
+            reward_batch.append( self._extract_block(self.rewards, i) )
             done_batch.append( self._extract_block(self.dones, i).astype(np.float32) )
 
-        obs_batch, act_batch, rew_batch, done_batch = map(np.array, [obs_batch, act_batch, rew_batch, done_batch])
+        state_batch, action_batch, reward_batch, done_batch = map(np.array, [state_batch, action_batch, reward_batch, done_batch])
 
         # Compute the n-step returns
-        ret_batch = self.refresh_func(obs_batch[:, -1])  # Begin with bootstrap states
+        return_batch = self.refresh_func(state_batch[:, -1])  # Begin with bootstrap states
         for i in reversed(range(self.n)):
-            ret_batch = rew_batch[:, i] + self.discount * ret_batch * (1.0 - done_batch[:, i])
+            return_batch = reward_batch[:, i] + self.discount * return_batch * (1.0 - done_batch[:, i])
 
-        return obs_batch[:, 0], act_batch[:, 0], ret_batch
+        return state_batch[:, 0], action_batch[:, 0], return_batch
 
     def refresh(self, cache_size, train_frac):
         raise NotImplementedError

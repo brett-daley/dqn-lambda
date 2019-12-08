@@ -30,7 +30,7 @@ def learn(
     assert (prepopulate % target_update_freq) == 0
     assert (target_update_freq % train_freq) == 0
     assert type(env.observation_space) == gym.spaces.Box
-    assert type(env.action_space)      == gym.spaces.Discrete
+    assert type(env.action_space) == gym.spaces.Discrete
 
     input_shape = (replay_memory.history_len, *env.observation_space.shape)
     n_actions = env.action_space.n
@@ -38,17 +38,17 @@ def learn(
 
     legacy_mode = isinstance(replay_memory, LegacyReplayMemory)
 
-    # build model
-    obs_t_ph  = tf.placeholder(env.observation_space.dtype, [None] + list(input_shape))
-    act_t_ph  = tf.placeholder(tf.int32,   [None])
+    # Build TensorFlow model
+    state_ph  = tf.placeholder(env.observation_space.dtype, [None] + list(input_shape))
+    action_ph = tf.placeholder(tf.int32, [None])
     return_ph = tf.placeholder(tf.float32, [None])
 
-    qvalues = q_function(obs_t_ph, n_actions, scope='main')
+    qvalues = q_function(state_ph, n_actions, scope='main')
 
     greedy_actions = tf.argmax(qvalues, axis=1)
     greedy_qvalues = tf.reduce_max(qvalues, axis=1)
 
-    action_indices = tf.stack([tf.range(tf.size(act_t_ph)), act_t_ph], axis=-1)
+    action_indices = tf.stack([tf.range(tf.size(action_ph)), action_ph], axis=-1)
     onpolicy_qvalues = tf.gather_nd(qvalues, action_indices)
 
     td_error = return_ph - onpolicy_qvalues
@@ -58,40 +58,39 @@ def learn(
         def refresh(states, actions):
             assert len(states) == len(actions) + 1  # We should have an extra bootstrap state
             greedy_qvals, greedy_acts, onpolicy_qvals = session.run([greedy_qvalues, greedy_actions, onpolicy_qvalues], feed_dict={
-                obs_t_ph: states,
-                act_t_ph: actions,
+                state_ph: states,
+                action_ph: actions,
             })
             mask = (actions == greedy_acts[:-1])
             return greedy_qvals, mask, onpolicy_qvals
     else:
-        max_target_qvalues = tf.reduce_max(q_function(obs_t_ph, n_actions, scope='target'), axis=1)
+        max_target_qvalues = tf.reduce_max(q_function(state_ph, n_actions, scope='target'), axis=1)
         target_update_op = create_copy_op(src_scope='main', dst_scope='target')
 
         def refresh(states):
-            return session.run(max_target_qvalues, feed_dict={obs_t_ph: states})
+            return session.run(max_target_qvalues, feed_dict={state_ph: states})
 
     main_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='main')
     train_op = minimize_with_grad_clipping(optimizer, loss, main_vars, grad_clip)
 
     replay_memory.register_refresh_func(refresh)
 
-    # initialize variables
     session.run(tf.global_variables_initializer())
 
-    def epsilon_greedy(obs, epsilon):
+    def epsilon_greedy(state, epsilon):
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            action = session.run(greedy_actions, feed_dict={obs_t_ph: obs[None]})[0]
+            action = session.run(greedy_actions, feed_dict={state_ph: state[None]})[0]
         return action
 
     def train():
-        obs_batch, act_batch, ret_batch = replay_memory.sample(batch_size)
+        state_batch, action_batch, return_batch = replay_memory.sample(batch_size)
 
         session.run(train_op, feed_dict={
-            obs_t_ph:  obs_batch,
-            act_t_ph:  act_batch,
-            return_ph: ret_batch,
+            state_ph: state_batch,
+            action_ph: action_batch,
+            return_ph: return_batch,
         })
 
     best_mean_reward = -float('inf')
@@ -130,9 +129,9 @@ def learn(
             break
 
         replay_memory.store_obs(obs)
-        obs = replay_memory.encode_recent_observation()
+        state = replay_memory.encode_recent_observation()
 
-        action = epsilon_greedy(obs, epsilon)
+        action = epsilon_greedy(state, epsilon)
         obs, reward, done, _ = env.step(action)
 
         replay_memory.store_effect(action, reward, done)
