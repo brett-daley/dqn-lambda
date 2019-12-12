@@ -33,13 +33,13 @@ def get_args():
                         help='(int) Minibatch size for training. Default: 32')
     parser.add_argument('--block-size', type=intfloat, default=100,
                         help='(int) Refresh the cache using sequences of this length. Cannot use with --legacy. Default: 100')
-    parser.add_argument('--cache-size', type=intfloat, default=80e3,
+    parser.add_argument('--cache-size', type=intfloat, default='80e3',
                         help='(int) Capacity of the cache. Cannot use with --legacy. Default: 80e3')
     parser.add_argument('--discount', type=float, default=0.99,
                         help='(float) Discount factor for future rewards. Must be in [0, 1]. Default: 0.99')
     parser.add_argument('--env', type=str, default='pong',
                         help="(str) Name of Atari game to play. See README. Default: 'pong'")
-    parser.add_argument('--explore-time', type=intfloat, default=1e6,
+    parser.add_argument('--explore-time', type=intfloat, default='1e6',
                         help='(int) Timeframe for annealing epsilon. Default: 1e6')
     parser.add_argument('--final-eps', type=float, default=0.1,
                         help='(float) Final epsilon value after annealing. Must be in [0, 1]. Default: 0.1')
@@ -51,9 +51,9 @@ def get_args():
                         help='(flag) Train DQN with target network instead of DQN(lambda) with cache. Default: disabled')
     parser.add_argument('--lr', type=float, default=1e-4,
                         help='(float) Learning rate for Adam optimizer. Default: 1e-4')
-    parser.add_argument('--mem-size', type=intfloat, default=1e6,
+    parser.add_argument('--mem-size', type=intfloat, default='1e6',
                         help='(int) Capacity of the replay memory. Default: 1e6')
-    parser.add_argument('--prepopulate', type=intfloat, default=50e3,
+    parser.add_argument('--prepopulate', type=intfloat, default='50e3',
                         help='(int) Initialize replay memory with random policy for this many timesteps. Default: 50e3')
     parser.add_argument('--priority', type=float, default=0.0,
                         help='(float) Extent to which cache samples are prioritized by TD error. Must be in [0, 1]. '
@@ -64,9 +64,9 @@ def get_args():
                         help='(int) Seed for random number generation. Default: 0')
     parser.add_argument('--train-freq', type=int, default=4,
                         help='(int) Frequency of minibatch training. Default: 4')
-    parser.add_argument('--timesteps', type=intfloat, default=10e6,
+    parser.add_argument('--timesteps', type=intfloat, default='10e6',
                         help='(int) Training duration in timesteps. Default: 10e6')
-    parser.add_argument('--update-freq', type=intfloat, default=10e3,
+    parser.add_argument('--update-freq', type=intfloat, default='10e3',
                         help='(int) Frequency of cache update (or target network update, with --legacy). Default: 10e3')
     return parser.parse_args()
 
