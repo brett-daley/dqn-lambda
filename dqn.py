@@ -126,20 +126,9 @@ def learn(
         if t >= max_timesteps:
             break
 
-        replay_memory.store_obs(obs)
-        state = replay_memory.encode_recent_observation()
-
-        action = epsilon_greedy(state, epsilon)
-        obs, reward, done, _ = env.step(action)
-
-        replay_memory.store_effect(action, reward, done)
-
-        if done:
-            obs = env.reset()
-
-        if t >= prepopulate:
-            t -= prepopulate  # Make relative to training start
-
+        # Check if we need to refresh or train
+        t -= prepopulate  # Make relative to training start
+        if t >= 0:
             if not legacy_mode:
                 if t % target_update_freq == 0:
                     replay_memory.refresh(train_frac)
@@ -153,6 +142,17 @@ def learn(
 
                 if t % train_freq == 0:
                     train()
+
+        # Step the environment once
+        replay_memory.store_obs(obs)
+        state = replay_memory.encode_recent_observation()
+
+        action = epsilon_greedy(state, epsilon)
+        obs, reward, done, _ = env.step(action)
+        replay_memory.store_effect(action, reward, done)
+
+        if done:
+            obs = env.reset()
 
     all_rewards = benchmark_rewards + get_episode_rewards(env)
     print('rewards=', all_rewards, sep='')
