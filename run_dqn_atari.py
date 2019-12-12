@@ -63,7 +63,7 @@ def get_args():
     parser.add_argument('--seed', type=int, default=0,
                         help='(int) Seed for random number generation. Default: 0')
     parser.add_argument('--train-freq', type=int, default=4,
-                        help='(int) Frequency of minibatch training. Default: 4')
+                        help='(int) Frequency of minibatch training (--legacy only). Default: 4')
     parser.add_argument('--timesteps', type=intfloat, default='10e6',
                         help='(int) Training duration in timesteps. Default: 10e6')
     parser.add_argument('--update-freq', type=intfloat, default='10e3',
@@ -88,10 +88,11 @@ def main():
                            )
 
     if not args.legacy:
+        assert args.train_freq == 4  # Training frequency is undefined for DQN(lambda)
         replay_memory = make_replay_memory(args.return_est, args.mem_size, args.history_len, args.discount,
                                            args.cache_size, args.block_size, args.priority)
     else:
-        assert args.cache_size == 80000      # Ensure cache-related args have not been set
+        assert args.cache_size == 80000  # Cache-related args are undefined for legacy DQN
         assert args.priority == 0.0
         assert args.block_size == 100
         replay_memory = make_legacy_replay_memory(args.return_est, args.mem_size, args.history_len, args.discount)
@@ -108,9 +109,9 @@ def main():
             args.timesteps,
             args.batch_size,
             args.prepopulate,
-            args.train_freq,
             args.update_freq,
-            args.grad_clip,
+            train_freq=args.train_freq,
+            grad_clip=args.grad_clip,
             log_every_n_steps=1000,
         )
     env.close()

@@ -44,8 +44,8 @@ def main():
             max_timesteps=500000,
             batch_size=32,
             prepopulate=prepopulate,
-            train_freq=4,
             target_update_freq=10000,
+            train_freq=4,
             log_every_n_steps=10000,
         )
     env.close()

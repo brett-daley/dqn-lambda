@@ -99,7 +99,7 @@ Traceback (most recent call last):
   File "run_dqn_atari.py", line 82, in <module>
     main()
   File "run_dqn_atari.py", line 56, in main
-    assert args.cache_size == 80000      # Ensure cache-related args have not been set
+    assert args.cache_size == 80000  # Cache-related args are undefined for legacy DQN
 AssertionError
 ```
 
