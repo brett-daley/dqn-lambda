@@ -27,8 +27,6 @@ def learn(
         mov_avg_size=100,
     ):
 
-    assert (prepopulate % target_update_freq) == 0
-    assert (target_update_freq % train_freq) == 0
     assert type(env.observation_space) == gym.spaces.Box
     assert type(env.action_space) == gym.spaces.Discrete
 
@@ -140,6 +138,8 @@ def learn(
             obs = env.reset()
 
         if t >= prepopulate:
+            t -= prepopulate  # Make relative to training start
+
             if not legacy_mode:
                 if t % target_update_freq == 0:
                     replay_memory.refresh(train_frac)
