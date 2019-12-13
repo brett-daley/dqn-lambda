@@ -1,0 +1,5 @@
+atari-py==0.1.7
+gym==0.10.9
+numpy>=1.15.4
+opencv-python>=4.0.0.21
+tensorflow==1.13.1

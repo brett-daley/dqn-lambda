@@ -9,27 +9,26 @@ from wrappers import HistoryWrapper
 from replay_memory_legacy import LegacyReplayMemory
 
 
-def learn(session,
-          env,
-          benchmark_env,
-          QFunction,
-          replay_memory,
-          optimizer,
-          exploration=LinearSchedule(1000000, 0.1),
-          max_timesteps=50000000,
-          batch_size=32,
-          learning_starts=50000,
-          learning_freq=4,
-          target_update_freq=10000,
-          grad_clip=None,
-          log_every_n_steps=100000,
-          mov_avg_size=100,
+def learn(
+        session,
+        env,
+        benchmark_env,
+        q_function,
+        replay_memory,
+        optimizer,
+        exploration,
+        max_timesteps,
+        batch_size,
+        prepopulate,
+        target_update_freq,
+        train_freq=None,
+        grad_clip=None,
+        log_every_n_steps=10000,
+        mov_avg_size=100,
     ):
 
-    assert (learning_starts % target_update_freq) == 0
-    assert (target_update_freq % learning_freq) == 0
     assert type(env.observation_space) == gym.spaces.Box
-    assert type(env.action_space)      == gym.spaces.Discrete
+    assert type(env.action_space) == gym.spaces.Discrete
 
     input_shape = (replay_memory.history_len, *env.observation_space.shape)
     n_actions = env.action_space.n
@@ -37,19 +36,17 @@ def learn(session,
 
     legacy_mode = isinstance(replay_memory, LegacyReplayMemory)
 
-    # build model
-    obs_t_ph  = tf.placeholder(env.observation_space.dtype, [None] + list(input_shape))
-    act_t_ph  = tf.placeholder(tf.int32,   [None])
+    # Build TensorFlow model
+    state_ph  = tf.placeholder(env.observation_space.dtype, [None] + list(input_shape))
+    action_ph = tf.placeholder(tf.int32, [None])
     return_ph = tf.placeholder(tf.float32, [None])
 
-    q_func = QFunction(obs_t_ph, n_actions, scope='main')
-    qvalues = q_func.qvalues
-    rnn_state_tf = q_func.rnn_state if q_func.is_recurrent() else None
+    qvalues = q_function(state_ph, n_actions, scope='main')
 
     greedy_actions = tf.argmax(qvalues, axis=1)
     greedy_qvalues = tf.reduce_max(qvalues, axis=1)
 
-    action_indices = tf.stack([tf.range(tf.size(act_t_ph)), act_t_ph], axis=-1)
+    action_indices = tf.stack([tf.range(tf.size(action_ph)), action_ph], axis=-1)
     onpolicy_qvalues = tf.gather_nd(qvalues, action_indices)
 
     td_error = return_ph - onpolicy_qvalues
@@ -59,67 +56,51 @@ def learn(session,
         def refresh(states, actions):
             assert len(states) == len(actions) + 1  # We should have an extra bootstrap state
             greedy_qvals, greedy_acts, onpolicy_qvals = session.run([greedy_qvalues, greedy_actions, onpolicy_qvalues], feed_dict={
-                obs_t_ph: states,
-                act_t_ph: actions,
+                state_ph: states,
+                action_ph: actions,
             })
             mask = (actions == greedy_acts[:-1])
             return greedy_qvals, mask, onpolicy_qvals
     else:
-        max_target_qvalues = tf.reduce_max(QFunction(obs_t_ph, n_actions, scope='target').qvalues, axis=1)
+        max_target_qvalues = tf.reduce_max(q_function(state_ph, n_actions, scope='target'), axis=1)
         target_update_op = create_copy_op(src_scope='main', dst_scope='target')
 
         def refresh(states):
-            return session.run(max_target_qvalues, feed_dict={obs_t_ph: states})
+            return session.run(max_target_qvalues, feed_dict={state_ph: states})
 
     main_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='main')
     train_op = minimize_with_grad_clipping(optimizer, loss, main_vars, grad_clip)
 
     replay_memory.register_refresh_func(refresh)
 
-    # initialize variables
     session.run(tf.global_variables_initializer())
 
-    def epsilon_greedy(obs, rnn_state, epsilon):
+    def epsilon_greedy(state, epsilon):
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            action = session.run(greedy_actions, feed_dict={obs_t_ph: obs[None]})[0]
-        return action, None
-
-    def epsilon_greedy_rnn(obs, rnn_state, epsilon):
-        feed_dict = {obs_t_ph: obs[None]}
-        if rnn_state is not None:
-            feed_dict[q_func.rnn_state] = rnn_state
-
-        if np.random.rand() < epsilon:
-            action = env.action_space.sample()
-            rnn_state = session.run(rnn_state_tf, feed_dict)
-        else:
-            action, rnn_state = session.run([greedy_actions, rnn_state_tf], feed_dict)
-            action = action[0]
-
-        return action, rnn_state
+            action = session.run(greedy_actions, feed_dict={state_ph: state[None]})[0]
+        return action
 
     def train():
-        obs_batch, act_batch, ret_batch = replay_memory.sample(batch_size)
+        state_batch, action_batch, return_batch = replay_memory.sample(batch_size)
 
         session.run(train_op, feed_dict={
-            obs_t_ph:  obs_batch,
-            act_t_ph:  act_batch,
-            return_ph: ret_batch,
+            state_ph: state_batch,
+            action_ph: action_batch,
+            return_ph: return_batch,
         })
 
     best_mean_reward = -float('inf')
     obs = env.reset()
-    rnn_state = None
     n_epochs = 0
 
-    policy = epsilon_greedy_rnn if q_func.is_recurrent() else epsilon_greedy
-    benchmark_rewards = benchmark(benchmark_env, policy, epsilon=1.0, n_episodes=mov_avg_size)
+    benchmark_rewards = benchmark(benchmark_env, policy=epsilon_greedy, epsilon=1.0, n_episodes=mov_avg_size)
     start_time = time.time()
 
     for t in itertools.count():
-        train_frac = max(0.0, (t - learning_starts) / (max_timesteps - learning_starts))
+        train_frac = max(0.0, (t - prepopulate) / (max_timesteps - prepopulate))
+        epsilon = exploration.value(t)
 
         if t % log_every_n_steps == 0:
             print('Epoch', n_epochs)
@@ -132,7 +113,7 @@ def learn(session,
             best_mean_reward = max(mean_reward, best_mean_reward)
 
             print('Episodes', len(get_episode_rewards(env)))
-            print('Exploration', exploration.value(t))
+            print('Exploration', epsilon)
             if not legacy_mode:
                 print('Priority', replay_memory.priority_now(train_frac))
             print('Mean reward', mean_reward)
@@ -145,19 +126,9 @@ def learn(session,
         if t >= max_timesteps:
             break
 
-        replay_memory.store_obs(obs)
-        obs = replay_memory.encode_recent_observation()
-
-        action, rnn_state = policy(obs, rnn_state, epsilon=exploration.value(t))
-        obs, reward, done, _ = env.step(action)
-
-        replay_memory.store_effect(action, reward, done)
-
-        if done:
-            obs = env.reset()
-            rnn_state = None
-
-        if t >= learning_starts:
+        # Check if we need to refresh or train
+        t -= prepopulate  # Make relative to training start
+        if t >= 0:
             if not legacy_mode:
                 if t % target_update_freq == 0:
                     replay_memory.refresh(train_frac)
@@ -169,8 +140,19 @@ def learn(session,
                 if t % target_update_freq == 0:
                     session.run(target_update_op)
 
-                if t % learning_freq == 0:
+                if t % train_freq == 0:
                     train()
+
+        # Step the environment once
+        replay_memory.store_obs(obs)
+        state = replay_memory.encode_recent_observation()
+
+        action = epsilon_greedy(state, epsilon)
+        obs, reward, done, _ = env.step(action)
+        replay_memory.store_effect(action, reward, done)
+
+        if done:
+            obs = env.reset()
 
     all_rewards = benchmark_rewards + get_episode_rewards(env)
     print('rewards=', all_rewards, sep='')

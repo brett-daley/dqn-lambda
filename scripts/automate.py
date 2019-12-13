@@ -49,14 +49,14 @@ class GPUArray:
             return 0
 
 
-def make_filename(env, legacy, history_len, recurrent, return_type, cache_size, priority, seed):
+def make_filename(env, legacy, history_len, recurrent, return_est, cache_size, priority, seed):
     if not legacy:
         filename = ['drqn' if recurrent else 'dqn']
     else:
         filename = ['drqn-legacy' if recurrent else 'dqn-legacy']
     filename += ['len-' + str(history_len)]
     filename += [env.replace('_', '-')]
-    filename += [return_type]
+    filename += [return_est]
     if cache_size is not None:
         filename += ['cache-size-' + str(cache_size)]
     if priority is not None:
@@ -65,14 +65,14 @@ def make_filename(env, legacy, history_len, recurrent, return_type, cache_size, 
     return '_'.join(filename)
 
 
-def make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, cache_size, priority, seed):
+def make_cmd(env, legacy, timesteps, history_len, recurrent, return_est, cache_size, priority, seed):
     cmd  = ['python', 'run_dqn_atari.py']
     cmd += ['--env', env]
     cmd += ['--timesteps', str(timesteps)]
     cmd += ['--history-len', str(history_len)]
     if recurrent:
         cmd += ['--recurrent']
-    cmd += ['--return-type', return_type]
+    cmd += ['--return-est', return_est]
     cmd += ['--seed', str(seed)]
     if not legacy:
         cmd += ['--cache-size', str(cache_size)]
@@ -95,12 +95,12 @@ def make_joblist(experiments):
 
         for env in exp['env']:
             for history_len in exp['history_len']:
-                for return_type in exp['return_type']:
+                for return_est in exp['return_est']:
                     for x in cache_size:
                         for p in priority:
                             for s in range(num_seeds):
-                                cmd = make_cmd(env, legacy, timesteps, history_len, recurrent, return_type, cache_size=x, priority=p, seed=s)
-                                filename = make_filename(env, legacy, history_len, recurrent, return_type, cache_size=x, priority=p, seed=s)
+                                cmd = make_cmd(env, legacy, timesteps, history_len, recurrent, return_est, cache_size=x, priority=p, seed=s)
+                                filename = make_filename(env, legacy, history_len, recurrent, return_est, cache_size=x, priority=p, seed=s)
                                 path = os.path.join(args.outdir, filename)
                                 jobs.append((cmd, path))
     return jobs
