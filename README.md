@@ -10,7 +10,7 @@ If you use this repository in published work, please cite the paper:
   title={Reconciling $\lambda$-Returns with Experience Replay},
   author={Daley, Brett and Amato, Christopher},
   booktitle={Advances in Neural Information Processing Systems},
-  pages={1131--1140},
+  pages={1133--1142},
   year={2019}
 }
 ```
