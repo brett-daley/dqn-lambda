@@ -75,7 +75,7 @@ This is useful to test code on laptops or low-end desktops — particularly thos
 
 `run_dqn_control.py` does not take command-line arguments; all values are hard-coded.
 You need to edit the file directly to change parameters.
-A [one-line change to the environment name](https://github.com/brett-daley/dqn-lambda/blob/67660460461eae1ac4f399f1e877bf919e6727fa/run_dqn_control.py#L20) is all you need to run [other environments](https://gym.openai.com/envs/#classic_control) (discrete action spaces only; _e.g._ `Acrobot-v1` or `MountainCar-v0`).
+A [one-line change to the environment name](https://github.com/brett-daley/dqn-lambda/blob/master/run_dqn_control.py#L20) is all you need to run [other environments](https://gym.openai.com/envs/#classic_control) (discrete action spaces only; _e.g._ `Acrobot-v1` or `MountainCar-v0`).
 
 
 ---
